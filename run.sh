@@ -5,4 +5,9 @@ cd build &&
 cmake .. &&
 make &&
 
-./lang
+echo "Running the compiler"
+./lang ../examples/hello.lg
+echo "Running GCC on the transpiled output"
+g++ transpiled.cc -o compiled.out
+echo "Running the compiled program"
+./compiled.out
