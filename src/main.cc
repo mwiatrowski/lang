@@ -11,6 +11,20 @@
 #include "parser.h"
 #include "strings.h"
 
+std::string generateFunctionCall(const AstNodeFuncCall &funcCall) {
+  if (funcCall.functionName.name != "print") {
+    return {};
+  }
+
+  auto stream = std::stringstream{};
+  stream << "std::cout";
+  for (const auto &arg : funcCall.arguments) {
+    stream << " << \"" << arg.value << "\"";
+  }
+  stream << " << std::endl;" << std::endl;
+  return stream.str();
+}
+
 void startCompilation(const std::string &rootSourceFile) {
   auto sourceStream = std::ifstream(rootSourceFile, std::ios::in);
   auto sourceFileContents =
@@ -28,6 +42,11 @@ void startCompilation(const std::string &rootSourceFile) {
   codeStream << "TOKENS:\n" << printTokens(tokens) << std::endl;
   codeStream << "ABSTRACT SYNTAX TREE:\n" << printAst(ast) << std::endl;
   codeStream << ")RAWSTRING\" << std::endl;" << std::endl;
+  codeStream << "std::cout << \"EXECUTION:\" << std::endl;" << std::endl;
+  for (const auto &node : ast) {
+    auto funcCall = std::get<AstNodeFuncCall>(node);
+    codeStream << generateFunctionCall(funcCall) << std::endl;
+  }
   codeStream << "}" << std::endl;
 
   auto outputStream = std::ofstream("transpiled.cc", std::ios::out);
