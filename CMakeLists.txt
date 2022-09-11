@@ -15,5 +15,6 @@ set(COMPILER_EXECUTABLE "lang")
 add_executable(${COMPILER_EXECUTABLE}
     src/lexer.cc
     src/main.cc
+    src/parser.cc
     src/strings.cc
 )
