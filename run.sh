@@ -5,9 +5,14 @@ cd build &&
 cmake .. &&
 make &&
 
-echo "Running the compiler"
-./lang ../examples/hello.lg
-echo "Running GCC on the transpiled output"
-g++ transpiled.cc -o compiled.out
-echo "Running the compiled program"
-./compiled.out
+for SOURCE in ../examples/*.lg; do
+    FULL_PATH=`realpath $SOURCE`
+    echo "=== Example: $FULL_PATH ==="
+
+    echo "Running the compiler" &&
+    ./lang $FULL_PATH &&
+    echo "Running GCC on the transpiled output" &&
+    g++ transpiled.cc -o compiled.out &&
+    echo "Running the compiled program" &&
+    ./compiled.out
+done

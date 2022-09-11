@@ -1,0 +1,3 @@
+func name with whitespace("hello")
+commas(1, 2, 3,   , 4)
+f(1, 2, 3) some garbage after the call
