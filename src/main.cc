@@ -18,7 +18,7 @@ void startCompilation(const std::string &rootSourceFile) {
                   std::istreambuf_iterator<char>());
 
   auto tokens = lexSourceCode(sourceFileContents);
-  auto ast = parseSourceFile(sourceFileContents);
+  auto ast = parseSourceFile(tokens);
 
   auto codeStream = std::stringstream{};
   codeStream << "#include <iostream>" << std::endl;

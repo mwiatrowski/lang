@@ -1,13 +1,16 @@
 #pragma once
 
+#include <span>
 #include <string>
 #include <string_view>
 #include <variant>
 #include <vector>
 
+#include "lexer.h"
+
 struct AstNodeFuncCall {
-  std::string_view functionName;
-  std::vector<std::string_view> arguments;
+  TokenIdentifier functionName;
+  std::vector<TokenStringLiteral> arguments;
 };
 
 using AstNode = std::variant<AstNodeFuncCall>;
@@ -15,4 +18,5 @@ using Ast = std::vector<AstNode>;
 
 std::string printAst(const Ast &ast);
 
-Ast parseSourceFile(std::string_view source);
+using TokensSpan = std::span<const Token>;
+Ast parseSourceFile(TokensSpan tokens);
