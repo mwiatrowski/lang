@@ -1,2 +1,2 @@
 print("Hello, World!")
-multiple_arguments(23, 0.6, 'c')
+multiple_arguments("first", "second", "third")

@@ -7,12 +7,14 @@
 #include <variant>
 #include <vector>
 
+#include "lexer.h"
 #include "strings.h"
 
 struct AstNodeFuncCall {
   std::string_view functionName;
   std::vector<std::string_view> arguments;
 };
+
 using AstNode = std::variant<AstNodeFuncCall>;
 using Ast = std::vector<AstNode>;
 
@@ -83,13 +85,17 @@ void startCompilation(const std::string &rootSourceFile) {
       std::string(std::istreambuf_iterator<char>(sourceStream),
                   std::istreambuf_iterator<char>());
 
+  auto tokens = lexSourceCode(sourceFileContents);
   auto ast = parseSourceFile(sourceFileContents);
 
   auto codeStream = std::stringstream{};
   codeStream << "#include <iostream>" << std::endl;
   codeStream << "int main() {" << std::endl;
-  codeStream << "std::cout << R\"RAWSTRING(" << printAst(ast)
-             << ")RAWSTRING\" << std::endl;" << std::endl;
+  codeStream << "std::cout << R\"RAWSTRING(";
+  codeStream << "SOURCE:\n" << sourceFileContents << std::endl;
+  codeStream << "TOKENS:\n" << printTokens(tokens) << std::endl;
+  codeStream << "ABSTRACT SYNTAX TREE:\n" << printAst(ast) << std::endl;
+  codeStream << ")RAWSTRING\" << std::endl;" << std::endl;
   codeStream << "}" << std::endl;
 
   auto outputStream = std::ofstream("transpiled.cc", std::ios::out);

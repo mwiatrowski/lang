@@ -13,6 +13,7 @@ add_link_options(-fsanitize=address)
 
 set(COMPILER_EXECUTABLE "lang")
 add_executable(${COMPILER_EXECUTABLE}
+    src/lexer.cc
     src/main.cc
     src/strings.cc
 )
