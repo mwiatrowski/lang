@@ -14,9 +14,13 @@ struct TokenIdentifier {
 struct TokenStringLiteral {
   std::string_view value;
 };
+struct TokenIntLiteral {
+  int64_t value;
+};
 
-using Token = std::variant<TokenLBrace, TokenRBrace, TokenComma,
-                           TokenIdentifier, TokenStringLiteral>;
+using Token =
+    std::variant<TokenLBrace, TokenRBrace, TokenComma, TokenIdentifier,
+                 TokenStringLiteral, TokenIntLiteral>;
 
 std::string printToken(const Token &token);
 std::string printTokens(const std::vector<Token> &tokens);
