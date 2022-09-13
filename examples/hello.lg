@@ -1,2 +1,4 @@
 print("Hello, World!")
 multiple_arguments("first", "second", "third")
+print("One", 2, three, four(x, y, z))
+no_arguments_is_ok()

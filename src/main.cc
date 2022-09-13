@@ -18,8 +18,24 @@ std::string generateFunctionCall(const AstNodeFuncCall &funcCall) {
 
   auto stream = std::stringstream{};
   stream << "std::cout";
-  for (const auto &arg : funcCall.arguments) {
-    stream << " << \"" << arg.value << "\"";
+  for (const auto &expr : funcCall.arguments) {
+    stream << " << ";
+
+    if (std::holds_alternative<AstNodeIntLiteral>(expr)) {
+      auto literal = std::get<AstNodeIntLiteral>(expr);
+      stream << literal.value.value;
+    } else if (std::holds_alternative<AstNodeStringLiteral>(expr)) {
+      auto literal = std::get<AstNodeStringLiteral>(expr);
+      stream << "\"" << literal.value.value << "\"";
+    } else if (std::holds_alternative<AstNodeIdentifier>(expr)) {
+      auto identifier = std::get<AstNodeIdentifier>(expr);
+      stream << "\"(value of " << identifier.value.name << ")\"";
+    } else if (std::holds_alternative<AstNodeFuncCall>(expr)) {
+      auto funcCall = std::get<AstNodeFuncCall>(expr);
+      stream << "\"(result of " << funcCall.functionName.name << ")\"";
+    }
+
+    stream << " << ' '";
   }
   stream << " << std::endl;" << std::endl;
   return stream.str();
@@ -44,8 +60,10 @@ void startCompilation(const std::string &rootSourceFile) {
   codeStream << ")RAWSTRING\" << std::endl;" << std::endl;
   codeStream << "std::cout << \"EXECUTION:\" << std::endl;" << std::endl;
   for (const auto &node : ast) {
-    auto funcCall = std::get<AstNodeFuncCall>(node);
-    codeStream << generateFunctionCall(funcCall) << std::endl;
+    if (std::holds_alternative<AstNodeFuncCall>(node)) {
+      auto funcCall = std::get<AstNodeFuncCall>(node);
+      codeStream << generateFunctionCall(funcCall) << std::endl;
+    }
   }
   codeStream << "}" << std::endl;
 

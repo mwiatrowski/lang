@@ -52,7 +52,7 @@ consumeIntLiteral(std::string_view input) {
   auto inputTail = input.substr(consumedInputLen);
 
   if (error != std::errc{}) {
-    std::cerr << "Couldn't parse the string literal: " << numStr << std::endl;
+    std::cerr << "Couldn't parse the integer literal: " << numStr << std::endl;
     return {{}, inputTail};
   }
 

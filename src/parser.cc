@@ -4,106 +4,168 @@
 #include <iostream>
 #include <optional>
 #include <sstream>
+#include <tuple>
 
 namespace {
 
-template <typename TokenType>
-std::pair<std::optional<TokenType>, TokensSpan> consume(TokensSpan tokens) {
-  if (tokens.empty()) {
-    return {{}, tokens};
+template <typename... TokenTypes> bool peek(TokensSpan tokens) {
+  static_assert(sizeof...(TokenTypes) > 0);
+
+  if (tokens.size() < sizeof...(TokenTypes)) {
+    return false;
   }
 
-  const auto &firstToken = tokens.front();
-  if (!std::holds_alternative<TokenType>(firstToken)) {
-    return {{}, tokens};
-  }
-
-  const auto &specificToken = std::get<TokenType>(firstToken);
-  return {specificToken, tokens.subspan(1)};
+  auto nextIdx = [idx = size_t{0}]() mutable { return idx++; };
+  return (std::holds_alternative<TokenTypes>(tokens[nextIdx()]) && ...);
 }
 
-std::optional<std::pair<AstNodeFuncCall, TokensSpan>>
-consumeFunctionCall(TokensSpan tokens) {
+template <typename TokenType>
+std::pair<TokenType, TokensSpan> consume(TokensSpan tokens) {
   assert(!tokens.empty());
+  const auto &firstToken = tokens[0];
 
-  auto [funcName, tAfterName] = consume<TokenIdentifier>(tokens);
-  if (!funcName) {
-    std::cerr << "Expected an identifier!" << std::endl;
+  assert(std::holds_alternative<TokenType>(firstToken));
+  const auto &tokenOfSpecificType = std::get<TokenType>(firstToken);
+
+  return {tokenOfSpecificType, tokens.subspan(1)};
+}
+
+template <typename TokenType> TokensSpan consumeUntil(TokensSpan tokens) {
+  auto lastConsumed =
+      std::find_if(tokens.begin(), tokens.end(), [](const Token &token) {
+        return std::holds_alternative<TokenType>(token);
+      });
+  if (lastConsumed == tokens.end()) {
     return {};
   }
+  return TokensSpan{std::next(lastConsumed), tokens.end()};
+}
 
-  auto [lBrace, tAfterLBrace] = consume<TokenLBrace>(tAfterName);
-  if (!lBrace) {
-    std::cerr << "Expected an opening brace!" << std::endl;
-    return {};
+std::pair<std::optional<AstNodeBasicExpr>, TokensSpan>
+consumeBasicExpression(TokensSpan tokens);
+
+std::pair<std::optional<AstNodeFuncCall>, TokensSpan>
+consumeFunctionCall(TokensSpan tokens) {
+  assert((peek<TokenIdentifier, TokenLBrace>(tokens)));
+
+  auto funcName = TokenIdentifier{};
+  std::tie(funcName, tokens) = consume<TokenIdentifier>(tokens);
+  std::tie(std::ignore, tokens) = consume<TokenLBrace>(tokens);
+
+  if (peek<TokenRBrace>(tokens)) {
+    std::tie(std::ignore, tokens) = consume<TokenRBrace>(tokens);
+    auto funcCall = AstNodeFuncCall{.functionName = funcName, .arguments = {}};
+    return {funcCall, tokens};
   }
 
-  if (tokens.empty()) {
-    std::cerr << "Expected more tokens!" << std::endl;
-    return {};
-  }
+  auto args = std::vector<AstNodeBasicExpr>{};
 
-  {
-    const auto &next = tAfterLBrace.front();
-    if (std::holds_alternative<TokenRBrace>(next)) {
-      auto [rBrace, tAfterRBrace] = consume<TokenRBrace>(tAfterLBrace);
-      auto funcCall =
-          AstNodeFuncCall{.functionName = *funcName, .arguments = {}};
-      return {{funcCall, tAfterRBrace}};
+  while (!tokens.empty()) {
+    auto expr = std::optional<AstNodeBasicExpr>{};
+    std::tie(expr, tokens) = consumeBasicExpression(tokens);
+
+    if (!expr.has_value()) {
+      std::cerr << "Expected an expression!" << std::endl;
+      return {{}, consumeUntil<TokenRBrace>(tokens)};
     }
-  }
-
-  auto args = std::vector<TokenStringLiteral>{};
-  auto tokensTail = tAfterLBrace;
-  do {
-    auto [arg, tAfterArg] = consume<TokenStringLiteral>(tokensTail);
-    if (!arg) {
-      std::cerr << "Expected an argument!" << std::endl;
-      return {};
-    }
-
-    args.push_back(*arg);
+    args.push_back(*expr);
 
     if (tokens.empty()) {
-      std::cerr << "Expected a comma or a closing brace!" << std::endl;
-      return {};
+      std::cerr << "No more tokens left!" << std::endl;
+      return {{}, {}};
     }
 
-    auto next = tAfterArg.front();
+    if (peek<TokenComma>(tokens)) {
+      std::tie(std::ignore, tokens) = consume<TokenComma>(tokens);
+      continue;
+    }
 
-    if (std::holds_alternative<TokenRBrace>(next)) {
-      auto [rBrace, tAfterRBrace] = consume<TokenRBrace>(tAfterArg);
-      auto funcCall = AstNodeFuncCall{.functionName = *funcName,
+    if (peek<TokenRBrace>(tokens)) {
+      std::tie(std::ignore, tokens) = consume<TokenRBrace>(tokens);
+      auto funcCall = AstNodeFuncCall{.functionName = funcName,
                                       .arguments = std::move(args)};
-      return {{std::move(funcCall), tAfterRBrace}};
+      return {funcCall, tokens};
     }
 
-    if (std::holds_alternative<TokenComma>(next)) {
-      auto [comma, tAfterComma] = consume<TokenComma>(tAfterArg);
-      tokensTail = tAfterComma;
-    } else {
-      std::cerr << "Expected a comma or a closing brace!" << std::endl;
-      return {};
-    }
-  } while (!tokens.empty());
+    assert(!tokens.empty());
+    std::cerr << "Expected either a comma or a closing brace, got "
+              << printToken(tokens.front()) << std::endl;
+    return {{}, consumeUntil<TokenRBrace>(tokens)};
+  }
 
+  assert(tokens.empty());
   std::cerr << "Expected more tokens!" << std::endl;
-  return {};
+  return {{}, {}};
+}
+
+std::pair<std::optional<AstNodeBasicExpr>, TokensSpan>
+consumeBasicExpression(TokensSpan tokens) {
+  assert(!tokens.empty());
+
+  if (peek<TokenIdentifier, TokenLBrace>(tokens)) {
+    auto [funcCall, tokensTail] = consumeFunctionCall(tokens);
+    auto basicExpr = funcCall.has_value()
+                         ? std::optional<AstNodeBasicExpr>{*funcCall}
+                         : std::optional<AstNodeBasicExpr>{};
+    return {basicExpr, tokensTail};
+  }
+
+  if (peek<TokenIdentifier>(tokens)) {
+    auto [tokenIdentifier, tokensTail] = consume<TokenIdentifier>(tokens);
+    auto identifier = AstNodeIdentifier{.value = tokenIdentifier};
+    return {AstNodeBasicExpr{identifier}, tokensTail};
+  }
+
+  if (peek<TokenIntLiteral>(tokens)) {
+    auto [tokenLiteral, tokensTail] = consume<TokenIntLiteral>(tokens);
+    auto literal = AstNodeIntLiteral{.value = tokenLiteral};
+    return {AstNodeBasicExpr{literal}, tokensTail};
+  }
+
+  if (peek<TokenStringLiteral>(tokens)) {
+    auto [tokenLiteral, tokensTail] = consume<TokenStringLiteral>(tokens);
+    auto literal = AstNodeStringLiteral{.value = tokenLiteral};
+    return {AstNodeBasicExpr{literal}, tokensTail};
+  }
+
+  std::cerr << "Failed to parse any expression" << std::endl;
+  return {{}, tokens};
 }
 
 } // namespace
+
+std::string printBasicExpression(const AstNodeBasicExpr &expr) {
+  if (std::holds_alternative<AstNodeIntLiteral>(expr)) {
+    auto literal = std::get<AstNodeIntLiteral>(expr);
+    return "(INT_LITERAL " + std::to_string(literal.value.value) + ")";
+  } else if (std::holds_alternative<AstNodeStringLiteral>(expr)) {
+    auto literal = std::get<AstNodeStringLiteral>(expr);
+    return "(STRING_LITERAL " + std::string{literal.value.value} + ")";
+  } else if (std::holds_alternative<AstNodeIdentifier>(expr)) {
+    auto identifier = std::get<AstNodeIdentifier>(expr);
+    return "(IDENTIFIER " + std::string{identifier.value.name} + ")";
+  } else if (std::holds_alternative<AstNodeFuncCall>(expr)) {
+    auto funcCall = std::get<AstNodeFuncCall>(expr);
+    auto stream = std::stringstream{};
+    stream << "(CALL " << funcCall.functionName.name;
+    for (const auto &arg : funcCall.arguments) {
+      stream << " " << printBasicExpression(arg);
+    }
+    stream << ")";
+    return stream.str();
+  }
+
+  std::cerr << "Unexpected expression type! Index: " << expr.index()
+            << std::endl;
+  return "UNKNOWN_EXPRESSION_TYPE";
+}
 
 std::string printAst(const Ast &ast) {
   auto stream = std::stringstream{};
 
   stream << "(" << std::endl;
-  for (const auto &node : ast) {
-    const auto &funcCall = std::get<AstNodeFuncCall>(node);
-    stream << "\t(CALL " << funcCall.functionName.name;
-    for (const auto &arg : funcCall.arguments) {
-      stream << " " << arg.value;
-    }
-    stream << ")" << std::endl;
+  for (const auto &expr : ast) {
+    stream << "\t" << printBasicExpression(expr) << std::endl;
   }
   stream << ")" << std::endl;
 
@@ -114,15 +176,19 @@ Ast parseSourceFile(TokensSpan tokens) {
   auto ast = Ast{};
 
   while (!tokens.empty()) {
-    if (const auto parseResult = consumeFunctionCall(tokens)) {
-      const auto &[funcCall, tokensTail] = *parseResult;
-      ast.push_back(funcCall);
+    auto [expr, tokensTail] = consumeBasicExpression(tokens);
+
+    if (tokens.size() == tokensTail.size()) {
+      std::cerr << "Failed to consume any input! Skipping this token: "
+                << printToken(tokens.front()) << std::endl;
+      tokens = tokens.subspan(1);
+    } else {
       tokens = tokensTail;
-      continue;
     }
 
-    std::cerr << "Parser error! Skipping to the next token." << std::endl;
-    tokens = tokens.subspan(1);
+    if (expr.has_value()) {
+      ast.push_back(*expr);
+    }
   }
 
   return ast;
