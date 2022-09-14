@@ -106,6 +106,14 @@ consumeOneToken(std::string_view input) {
     return {TokenComma{}, input.substr(1)};
   }
 
+  if (front == '+') {
+    return {TokenPlus{}, input.substr(1)};
+  }
+
+  if (front == '-') {
+    return {TokenMinus{}, input.substr(1)};
+  }
+
   if (front == '"') {
     return consumeStringLiteral(input);
   }
@@ -126,6 +134,10 @@ std::string printToken(const Token &token) {
     return "RBRACE";
   } else if (std::holds_alternative<TokenComma>(token)) {
     return "COMMA";
+  } else if (std::holds_alternative<TokenPlus>(token)) {
+    return "PLUS";
+  } else if (std::holds_alternative<TokenMinus>(token)) {
+    return "MINUS";
   } else if (std::holds_alternative<TokenIdentifier>(token)) {
     const auto &identifier = std::get<TokenIdentifier>(token);
     return "(IDENTIFIER " + std::string{identifier.name} + ")";

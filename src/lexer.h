@@ -8,6 +8,8 @@
 struct TokenLBrace {};
 struct TokenRBrace {};
 struct TokenComma {};
+struct TokenPlus {};
+struct TokenMinus {};
 struct TokenIdentifier {
   std::string_view name;
 };
@@ -19,8 +21,8 @@ struct TokenIntLiteral {
 };
 
 using Token =
-    std::variant<TokenLBrace, TokenRBrace, TokenComma, TokenIdentifier,
-                 TokenStringLiteral, TokenIntLiteral>;
+    std::variant<TokenLBrace, TokenRBrace, TokenComma, TokenPlus, TokenMinus,
+                 TokenIdentifier, TokenStringLiteral, TokenIntLiteral>;
 
 std::string printToken(const Token &token);
 std::string printTokens(const std::vector<Token> &tokens);

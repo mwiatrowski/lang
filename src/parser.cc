@@ -41,8 +41,8 @@ template <typename TokenType> TokensSpan consumeUntil(TokensSpan tokens) {
   return TokensSpan{std::next(lastConsumed), tokens.end()};
 }
 
-std::pair<std::optional<AstNodeBasicExpr>, TokensSpan>
-consumeBasicExpression(TokensSpan tokens);
+std::pair<std::optional<AstNodeExpr>, TokensSpan>
+consumeExpression(TokensSpan tokens);
 
 std::pair<std::optional<AstNodeFuncCall>, TokensSpan>
 consumeFunctionCall(TokensSpan tokens) {
@@ -58,11 +58,11 @@ consumeFunctionCall(TokensSpan tokens) {
     return {funcCall, tokens};
   }
 
-  auto args = std::vector<AstNodeBasicExpr>{};
+  auto args = std::vector<AstNodeExpr>{};
 
   while (!tokens.empty()) {
-    auto expr = std::optional<AstNodeBasicExpr>{};
-    std::tie(expr, tokens) = consumeBasicExpression(tokens);
+    auto expr = std::optional<AstNodeExpr>{};
+    std::tie(expr, tokens) = consumeExpression(tokens);
 
     if (!expr.has_value()) {
       std::cerr << "Expected an expression!" << std::endl;
@@ -98,43 +98,119 @@ consumeFunctionCall(TokensSpan tokens) {
   return {{}, {}};
 }
 
-std::pair<std::optional<AstNodeBasicExpr>, TokensSpan>
+std::pair<std::optional<AstNodeExpr>, TokensSpan>
 consumeBasicExpression(TokensSpan tokens) {
   assert(!tokens.empty());
 
   if (peek<TokenIdentifier, TokenLBrace>(tokens)) {
     auto [funcCall, tokensTail] = consumeFunctionCall(tokens);
-    auto basicExpr = funcCall.has_value()
-                         ? std::optional<AstNodeBasicExpr>{*funcCall}
-                         : std::optional<AstNodeBasicExpr>{};
-    return {basicExpr, tokensTail};
+    auto expr = funcCall.has_value() ? std::optional<AstNodeExpr>{*funcCall}
+                                     : std::optional<AstNodeExpr>{};
+    return {expr, tokensTail};
   }
 
   if (peek<TokenIdentifier>(tokens)) {
     auto [tokenIdentifier, tokensTail] = consume<TokenIdentifier>(tokens);
     auto identifier = AstNodeIdentifier{.value = tokenIdentifier};
-    return {AstNodeBasicExpr{identifier}, tokensTail};
+    return {AstNodeExpr{identifier}, tokensTail};
   }
 
   if (peek<TokenIntLiteral>(tokens)) {
     auto [tokenLiteral, tokensTail] = consume<TokenIntLiteral>(tokens);
     auto literal = AstNodeIntLiteral{.value = tokenLiteral};
-    return {AstNodeBasicExpr{literal}, tokensTail};
+    return {AstNodeExpr{literal}, tokensTail};
   }
 
   if (peek<TokenStringLiteral>(tokens)) {
     auto [tokenLiteral, tokensTail] = consume<TokenStringLiteral>(tokens);
     auto literal = AstNodeStringLiteral{.value = tokenLiteral};
-    return {AstNodeBasicExpr{literal}, tokensTail};
+    return {AstNodeExpr{literal}, tokensTail};
+  }
+
+  if (peek<TokenMinus>(tokens)) {
+    std::tie(std::ignore, tokens) = consume<TokenMinus>(tokens);
+    auto expr = std::optional<AstNodeExpr>{};
+    std::tie(expr, tokens) = consumeExpression(tokens);
+
+    if (!expr) {
+      std::cerr << "Expected an expression after a unary minus" << std::endl;
+      return {{}, tokens};
+    }
+
+    auto negation = AstNodeNegation{.operands = {*expr}};
+    return {AstNodeExpr{std::move(negation)}, tokens};
   }
 
   std::cerr << "Failed to parse any expression" << std::endl;
   return {{}, tokens};
 }
 
+std::pair<std::optional<AstNodeExpr>, TokensSpan>
+consumeExpression(TokensSpan tokens) {
+  assert(!tokens.empty());
+
+  auto firstBasicExpr = std::optional<AstNodeExpr>{};
+  std::tie(firstBasicExpr, tokens) = consumeBasicExpression(tokens);
+
+  if (!firstBasicExpr) {
+    std::cerr << "Failed to parse an expression!" << std::endl;
+    return {{}, tokens};
+  }
+
+  auto subExprs = std::vector<AstNodeExpr>{*firstBasicExpr};
+  auto operators = std::vector<Token>{};
+
+  while (!tokens.empty()) {
+    if (peek<TokenPlus>(tokens)) {
+      std::tie(std::ignore, tokens) = consume<TokenPlus>(tokens);
+      operators.push_back(TokenPlus{});
+    } else if (peek<TokenMinus>(tokens)) {
+      std::tie(std::ignore, tokens) = consume<TokenMinus>(tokens);
+      operators.push_back(TokenMinus{});
+    } else {
+      break;
+    }
+
+    auto nextBasicExpr = std::optional<AstNodeExpr>{};
+    std::tie(nextBasicExpr, tokens) = consumeBasicExpression(tokens);
+
+    if (!nextBasicExpr) {
+      std::cerr << "Failed to parse an expression!" << std::endl;
+      return {{}, tokens};
+    }
+
+    subExprs.push_back(std::move(*nextBasicExpr));
+  }
+
+  assert(!subExprs.empty());
+  assert(subExprs.size() == operators.size() + 1);
+
+  // Addition and substraction have the same priority, so the resulting tree has
+  // a trivial structure.
+  auto lhs = std::move(subExprs.front());
+  for (auto i = size_t{}; i < operators.size(); ++i) {
+    auto rhs = std::move(subExprs.at(i + 1));
+    auto op = operators.at(i);
+
+    auto operands = std::vector<AstNodeExpr>{std::move(lhs), std::move(rhs)};
+    if (std::holds_alternative<TokenPlus>(op)) {
+      auto newLhs = AstNodeAddition{.operands = std::move(operands)};
+      lhs = AstNodeExpr{std::move(newLhs)};
+    } else if (std::holds_alternative<TokenMinus>(op)) {
+      auto newLhs = AstNodeSubstraction{.operands = std::move(operands)};
+      lhs = AstNodeExpr{std::move(newLhs)};
+    } else {
+      std::cerr << "Expected a binary operation, got " << printToken(op)
+                << std::endl;
+      assert(false);
+    }
+  }
+  return std::make_pair(std::move(lhs), tokens);
+}
+
 } // namespace
 
-std::string printBasicExpression(const AstNodeBasicExpr &expr) {
+std::string printExpression(const AstNodeExpr &expr) {
   if (std::holds_alternative<AstNodeIntLiteral>(expr)) {
     auto literal = std::get<AstNodeIntLiteral>(expr);
     return "(INT_LITERAL " + std::to_string(literal.value.value) + ")";
@@ -149,15 +225,32 @@ std::string printBasicExpression(const AstNodeBasicExpr &expr) {
     auto stream = std::stringstream{};
     stream << "(CALL " << funcCall.functionName.name;
     for (const auto &arg : funcCall.arguments) {
-      stream << " " << printBasicExpression(arg);
+      stream << " " << printExpression(arg);
     }
     stream << ")";
     return stream.str();
+  } else if (std::holds_alternative<AstNodeAddition>(expr)) {
+    auto addition = std::get<AstNodeAddition>(expr);
+    const auto &operands = addition.operands;
+    assert(operands.size() == 2);
+    return "(" + printExpression(operands[0]) + " + " +
+           printExpression(operands[1]) + ")";
+  } else if (std::holds_alternative<AstNodeSubstraction>(expr)) {
+    auto substraction = std::get<AstNodeSubstraction>(expr);
+    const auto &operands = substraction.operands;
+    assert(operands.size() == 2);
+    return "(" + printExpression(operands[0]) + " - " +
+           printExpression(operands[1]) + ")";
+  } else if (std::holds_alternative<AstNodeNegation>(expr)) {
+    auto negation = std::get<AstNodeNegation>(expr);
+    const auto &operands = negation.operands;
+    assert(operands.size() == 1);
+    return "( - " + printExpression(operands[0]) + ")";
   }
 
   std::cerr << "Unexpected expression type! Index: " << expr.index()
             << std::endl;
-  return "UNKNOWN_EXPRESSION_TYPE";
+  assert(false);
 }
 
 std::string printAst(const Ast &ast) {
@@ -165,7 +258,7 @@ std::string printAst(const Ast &ast) {
 
   stream << "(" << std::endl;
   for (const auto &expr : ast) {
-    stream << "\t" << printBasicExpression(expr) << std::endl;
+    stream << "\t" << printExpression(expr) << std::endl;
   }
   stream << ")" << std::endl;
 
@@ -176,7 +269,7 @@ Ast parseSourceFile(TokensSpan tokens) {
   auto ast = Ast{};
 
   while (!tokens.empty()) {
-    auto [expr, tokensTail] = consumeBasicExpression(tokens);
+    auto [expr, tokensTail] = consumeExpression(tokens);
 
     if (tokens.size() == tokensTail.size()) {
       std::cerr << "Failed to consume any input! Skipping this token: "

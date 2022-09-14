@@ -33,6 +33,14 @@ std::string generateFunctionCall(const AstNodeFuncCall &funcCall) {
     } else if (std::holds_alternative<AstNodeFuncCall>(expr)) {
       auto funcCall = std::get<AstNodeFuncCall>(expr);
       stream << "\"(result of " << funcCall.functionName.name << ")\"";
+    } else if (std::holds_alternative<AstNodeAddition>(expr)) {
+      stream << "\"(an addition)\"";
+    } else if (std::holds_alternative<AstNodeSubstraction>(expr)) {
+      stream << "\"(a substraction)\"";
+    } else if (std::holds_alternative<AstNodeNegation>(expr)) {
+      stream << "\"(a negation)\"";
+    } else {
+      stream << "\"(some other AST node)\"";
     }
 
     stream << " << ' '";

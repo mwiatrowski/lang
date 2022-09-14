@@ -8,7 +8,7 @@
 
 #include "lexer.h"
 
-struct AstNodeBasicExpr;
+struct AstNodeExpr;
 
 struct AstNodeIntLiteral {
   TokenIntLiteral value;
@@ -21,14 +21,27 @@ struct AstNodeIdentifier {
 };
 struct AstNodeFuncCall {
   TokenIdentifier functionName;
-  std::vector<AstNodeBasicExpr> arguments;
+  std::vector<AstNodeExpr> arguments;
 };
 
-struct AstNodeBasicExpr
-    : public std::variant<AstNodeIntLiteral, AstNodeStringLiteral,
-                          AstNodeIdentifier, AstNodeFuncCall> {};
+struct AstNodeAddition {
+  std::vector<AstNodeExpr> operands; // size 2
+};
 
-using AstNode = AstNodeBasicExpr;
+struct AstNodeSubstraction {
+  std::vector<AstNodeExpr> operands; // size 2
+};
+
+struct AstNodeNegation {
+  std::vector<AstNodeExpr> operands; // size 1
+};
+
+struct AstNodeExpr
+    : public std::variant<AstNodeIntLiteral, AstNodeStringLiteral,
+                          AstNodeIdentifier, AstNodeFuncCall, AstNodeAddition,
+                          AstNodeSubstraction, AstNodeNegation> {};
+
+using AstNode = AstNodeExpr;
 
 using Ast = std::vector<AstNode>;
 
