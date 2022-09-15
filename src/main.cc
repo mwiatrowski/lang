@@ -10,6 +10,7 @@
 #include "lexer.h"
 #include "parser.h"
 #include "strings.h"
+#include "types.h"
 
 std::string generateFunctionCall(const AstNodeFuncCall &funcCall) {
   if (funcCall.functionName.name != "print") {
@@ -57,6 +58,7 @@ void startCompilation(const std::string &rootSourceFile) {
 
   auto tokens = lexSourceCode(sourceFileContents);
   auto ast = parseSourceFile(tokens);
+  auto typeInfo = resolveTypes(ast);
 
   auto codeStream = std::stringstream{};
   codeStream << "#include <iostream>" << std::endl;
@@ -65,6 +67,10 @@ void startCompilation(const std::string &rootSourceFile) {
   codeStream << "SOURCE:\n" << sourceFileContents << std::endl;
   codeStream << "TOKENS:\n" << printTokens(tokens) << std::endl;
   codeStream << "ABSTRACT SYNTAX TREE:\n" << printAst(ast) << std::endl;
+  codeStream << "TYPES:" << std::endl;
+  for (const auto &[name, type] : typeInfo) {
+    codeStream << name << " : " << printType(type) << std::endl;
+  }
   codeStream << ")RAWSTRING\" << std::endl;" << std::endl;
   codeStream << "std::cout << \"EXECUTION:\" << std::endl;" << std::endl;
   for (const auto &node : ast) {

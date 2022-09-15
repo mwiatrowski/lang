@@ -1,0 +1,6 @@
+x := 10
+y := x - 7
+z := -1 + x + y
+s := "What's up?"
+
+print(x + y, z, s)
