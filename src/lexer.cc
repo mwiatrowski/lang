@@ -114,6 +114,12 @@ consumeOneToken(std::string_view input) {
     return {TokenMinus{}, input.substr(1)};
   }
 
+  if (front == ':' && input.size() >= 2) {
+    if (input[1] == '=') {
+      return {TokenAssignment{}, input.substr(2)};
+    }
+  }
+
   if (front == '"') {
     return consumeStringLiteral(input);
   }
@@ -138,6 +144,8 @@ std::string printToken(const Token &token) {
     return "PLUS";
   } else if (std::holds_alternative<TokenMinus>(token)) {
     return "MINUS";
+  } else if (std::holds_alternative<TokenAssignment>(token)) {
+    return "ASSIGN";
   } else if (std::holds_alternative<TokenIdentifier>(token)) {
     const auto &identifier = std::get<TokenIdentifier>(token);
     return "(IDENTIFIER " + std::string{identifier.name} + ")";

@@ -41,7 +41,14 @@ struct AstNodeExpr
                           AstNodeIdentifier, AstNodeFuncCall, AstNodeAddition,
                           AstNodeSubstraction, AstNodeNegation> {};
 
-using AstNode = AstNodeExpr;
+struct AstNodeAssignment {
+  TokenIdentifier variable;
+  AstNodeExpr value;
+};
+
+using AstNodeStmt = std::variant<AstNodeAssignment, AstNodeFuncCall>;
+
+using AstNode = AstNodeStmt;
 
 using Ast = std::vector<AstNode>;
 

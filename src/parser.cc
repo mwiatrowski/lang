@@ -208,6 +208,43 @@ consumeExpression(TokensSpan tokens) {
   return std::make_pair(std::move(lhs), tokens);
 }
 
+std::pair<std::optional<AstNodeStmt>, TokensSpan>
+consumeAssignment(TokensSpan tokens) {
+  assert(tokens.size() >= 2);
+  assert((peek<TokenIdentifier, TokenAssignment>(tokens)));
+
+  auto variable = std::optional<TokenIdentifier>{};
+  std::tie(variable, tokens) = consume<TokenIdentifier>(tokens);
+  assert(variable.has_value());
+  std::tie(std::ignore, tokens) = consume<TokenAssignment>(tokens);
+
+  auto expr = std::optional<AstNodeExpr>{};
+  std::tie(expr, tokens) = consumeExpression(tokens);
+
+  if (!expr) {
+    std::cerr << "Expected an expression" << std::endl;
+    return {{}, tokens};
+  }
+
+  auto assignment = AstNodeAssignment{.variable = std::move(*variable),
+                                      .value = std::move(*expr)};
+  return {std::move(assignment), tokens};
+}
+
+std::pair<std::optional<AstNodeStmt>, TokensSpan>
+consumeStatement(TokensSpan tokens) {
+  assert(!tokens.empty());
+
+  if (peek<TokenIdentifier, TokenAssignment>(tokens)) {
+    return consumeAssignment(tokens);
+  } else if (peek<TokenIdentifier>(tokens)) {
+    return consumeFunctionCall(tokens);
+  }
+
+  std::cerr << "Failed to parse a statement" << std::endl;
+  return {{}, tokens};
+}
+
 } // namespace
 
 std::string printExpression(const AstNodeExpr &expr) {
@@ -253,12 +290,27 @@ std::string printExpression(const AstNodeExpr &expr) {
   assert(false);
 }
 
+std::string printStatement(const AstNodeStmt &stmt) {
+  if (std::holds_alternative<AstNodeFuncCall>(stmt)) {
+    auto funcCall = std::get<AstNodeFuncCall>(stmt);
+    return printExpression(AstNodeExpr{funcCall});
+  } else if (std::holds_alternative<AstNodeAssignment>(stmt)) {
+    auto assignment = std::get<AstNodeAssignment>(stmt);
+    return std::string{assignment.variable.name} +
+           " := " + printExpression(AstNodeExpr{assignment.value});
+  }
+
+  std::cerr << "Unexpected statement type! Index: " << stmt.index()
+            << std::endl;
+  assert(false);
+}
+
 std::string printAst(const Ast &ast) {
   auto stream = std::stringstream{};
 
   stream << "(" << std::endl;
-  for (const auto &expr : ast) {
-    stream << "\t" << printExpression(expr) << std::endl;
+  for (const auto &stmt : ast) {
+    stream << "\t" << printStatement(stmt) << std::endl;
   }
   stream << ")" << std::endl;
 
@@ -269,7 +321,7 @@ Ast parseSourceFile(TokensSpan tokens) {
   auto ast = Ast{};
 
   while (!tokens.empty()) {
-    auto [expr, tokensTail] = consumeExpression(tokens);
+    auto [stmt, tokensTail] = consumeStatement(tokens);
 
     if (tokens.size() == tokensTail.size()) {
       std::cerr << "Failed to consume any input! Skipping this token: "
@@ -279,8 +331,8 @@ Ast parseSourceFile(TokensSpan tokens) {
       tokens = tokensTail;
     }
 
-    if (expr.has_value()) {
-      ast.push_back(*expr);
+    if (stmt.has_value()) {
+      ast.push_back(*stmt);
     }
   }
 
