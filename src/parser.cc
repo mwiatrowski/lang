@@ -46,7 +46,12 @@ consumeExpression(TokensSpan tokens);
 
 std::pair<std::optional<AstNodeFuncCall>, TokensSpan>
 consumeFunctionCall(TokensSpan tokens) {
-  assert((peek<TokenIdentifier, TokenLBrace>(tokens)));
+  if (!peek<TokenIdentifier, TokenLBrace>(tokens)) {
+    std::cerr << "Function call must start with the name of the function and "
+                 "an opening brace."
+              << std::endl;
+    return {{}, tokens};
+  }
 
   auto funcName = TokenIdentifier{};
   std::tie(funcName, tokens) = consume<TokenIdentifier>(tokens);
@@ -100,8 +105,6 @@ consumeFunctionCall(TokensSpan tokens) {
 
 std::pair<std::optional<AstNodeExpr>, TokensSpan>
 consumeBasicExpression(TokensSpan tokens) {
-  assert(!tokens.empty());
-
   if (peek<TokenIdentifier, TokenLBrace>(tokens)) {
     auto [funcCall, tokensTail] = consumeFunctionCall(tokens);
     auto expr = funcCall.has_value() ? std::optional<AstNodeExpr>{*funcCall}
@@ -147,8 +150,6 @@ consumeBasicExpression(TokensSpan tokens) {
 
 std::pair<std::optional<AstNodeExpr>, TokensSpan>
 consumeExpression(TokensSpan tokens) {
-  assert(!tokens.empty());
-
   auto firstBasicExpr = std::optional<AstNodeExpr>{};
   std::tie(firstBasicExpr, tokens) = consumeBasicExpression(tokens);
 
@@ -210,8 +211,12 @@ consumeExpression(TokensSpan tokens) {
 
 std::pair<std::optional<AstNodeStmt>, TokensSpan>
 consumeAssignment(TokensSpan tokens) {
-  assert(tokens.size() >= 2);
-  assert((peek<TokenIdentifier, TokenAssignment>(tokens)));
+  if (!peek<TokenIdentifier, TokenAssignment>(tokens)) {
+    std::cerr << "Assignment must start with a variable name and an assignment "
+                 "operator."
+              << std::endl;
+    return {{}, tokens};
+  }
 
   auto variable = std::optional<TokenIdentifier>{};
   std::tie(variable, tokens) = consume<TokenIdentifier>(tokens);
@@ -233,11 +238,9 @@ consumeAssignment(TokensSpan tokens) {
 
 std::pair<std::optional<AstNodeStmt>, TokensSpan>
 consumeStatement(TokensSpan tokens) {
-  assert(!tokens.empty());
-
   if (peek<TokenIdentifier, TokenAssignment>(tokens)) {
     return consumeAssignment(tokens);
-  } else if (peek<TokenIdentifier>(tokens)) {
+  } else if (peek<TokenIdentifier, TokenLBrace>(tokens)) {
     return consumeFunctionCall(tokens);
   }
 
