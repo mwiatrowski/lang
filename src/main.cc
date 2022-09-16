@@ -1,56 +1,18 @@
 #include <fstream>
 #include <iostream>
-#include <optional>
-#include <sstream>
 #include <string>
-#include <string_view>
-#include <variant>
-#include <vector>
 
+#include "codegen.h"
 #include "lexer.h"
 #include "parser.h"
-#include "strings.h"
 #include "types.h"
 
-std::string generateFunctionCall(const AstNodeFuncCall &funcCall) {
-  if (funcCall.functionName.name != "print") {
-    return {};
-  }
+namespace {
 
-  auto stream = std::stringstream{};
-  stream << "std::cout";
-  for (const auto &expr : funcCall.arguments) {
-    stream << " << ";
+constexpr auto *OUTPUT_FILE = "transpiled.cc";
 
-    if (std::holds_alternative<AstNodeIntLiteral>(expr)) {
-      auto literal = std::get<AstNodeIntLiteral>(expr);
-      stream << literal.value.value;
-    } else if (std::holds_alternative<AstNodeStringLiteral>(expr)) {
-      auto literal = std::get<AstNodeStringLiteral>(expr);
-      stream << "\"" << literal.value.value << "\"";
-    } else if (std::holds_alternative<AstNodeIdentifier>(expr)) {
-      auto identifier = std::get<AstNodeIdentifier>(expr);
-      stream << "\"(value of " << identifier.value.name << ")\"";
-    } else if (std::holds_alternative<AstNodeFuncCall>(expr)) {
-      auto funcCall = std::get<AstNodeFuncCall>(expr);
-      stream << "\"(result of " << funcCall.functionName.name << ")\"";
-    } else if (std::holds_alternative<AstNodeAddition>(expr)) {
-      stream << "\"(an addition)\"";
-    } else if (std::holds_alternative<AstNodeSubstraction>(expr)) {
-      stream << "\"(a substraction)\"";
-    } else if (std::holds_alternative<AstNodeNegation>(expr)) {
-      stream << "\"(a negation)\"";
-    } else {
-      stream << "\"(some other AST node)\"";
-    }
-
-    stream << " << ' '";
-  }
-  stream << " << std::endl;" << std::endl;
-  return stream.str();
-}
-
-void startCompilation(const std::string &rootSourceFile) {
+void startCompilation(const std::string &rootSourceFile,
+                      const std::string &outputFile) {
   auto sourceStream = std::ifstream(rootSourceFile, std::ios::in);
   auto sourceFileContents =
       std::string(std::istreambuf_iterator<char>(sourceStream),
@@ -59,31 +21,13 @@ void startCompilation(const std::string &rootSourceFile) {
   auto tokens = lexSourceCode(sourceFileContents);
   auto ast = parseSourceFile(tokens);
   auto typeInfo = resolveTypes(ast);
+  (void)typeInfo;
 
-  auto codeStream = std::stringstream{};
-  codeStream << "#include <iostream>" << std::endl;
-  codeStream << "int main() {" << std::endl;
-  codeStream << "std::cout << R\"RAWSTRING(";
-  codeStream << "SOURCE:\n" << sourceFileContents << std::endl;
-  codeStream << "TOKENS:\n" << printTokens(tokens) << std::endl;
-  codeStream << "ABSTRACT SYNTAX TREE:\n" << printAst(ast) << std::endl;
-  codeStream << "TYPES:" << std::endl;
-  for (const auto &[name, type] : typeInfo) {
-    codeStream << name << " : " << printType(type) << std::endl;
-  }
-  codeStream << ")RAWSTRING\" << std::endl;" << std::endl;
-  codeStream << "std::cout << \"EXECUTION:\" << std::endl;" << std::endl;
-  for (const auto &node : ast) {
-    if (std::holds_alternative<AstNodeFuncCall>(node)) {
-      auto funcCall = std::get<AstNodeFuncCall>(node);
-      codeStream << generateFunctionCall(funcCall) << std::endl;
-    }
-  }
-  codeStream << "}" << std::endl;
-
-  auto outputStream = std::ofstream("transpiled.cc", std::ios::out);
-  outputStream << codeStream.str();
+  auto outputStream = std::ofstream(outputFile, std::ios::out);
+  outputStream << generateCode(ast);
 }
+
+} // namespace
 
 int main(int argc, char *argv[]) {
   if (argc != 2) {
@@ -94,5 +38,5 @@ int main(int argc, char *argv[]) {
   auto sourceFile = std::string{argv[1]};
   std::cerr << "Compiling " << sourceFile << std::endl;
 
-  startCompilation(sourceFile);
+  startCompilation(sourceFile, OUTPUT_FILE);
 }

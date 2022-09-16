@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+L_GREEN='\033[1;32m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
 mkdir -p build &&
 cd build &&
 cmake .. &&
@@ -7,12 +11,12 @@ make &&
 
 for SOURCE in ../examples/*.lg; do
     FULL_PATH=`realpath $SOURCE`
-    echo "=== Example: $FULL_PATH ==="
+    echo -e "${L_GREEN}=== Example: $FULL_PATH ===${NC}"
 
-    echo "Running the compiler" &&
+    echo -e "${CYAN}Running the compiler${NC}" &&
     ./lang $FULL_PATH &&
-    echo "Running GCC on the transpiled output" &&
+    echo -e "${CYAN}Running GCC on the transpiled output${NC}" &&
     g++ transpiled.cc -o compiled.out &&
-    echo "Running the compiled program" &&
+    echo -e "${CYAN}Running the compiled program${NC}" &&
     ./compiled.out
 done
