@@ -5,11 +5,19 @@
 
 std::string printToken(const Token &token) {
   if (std::holds_alternative<TokenLBrace>(token)) {
-    return "LBRACE";
+    return "L_BRACE";
   } else if (std::holds_alternative<TokenRBrace>(token)) {
-    return "RBRACE";
+    return "R_BRACE";
+  } else if (std::holds_alternative<TokenLCurBrace>(token)) {
+    return "L_CURLY_BRACE";
+  } else if (std::holds_alternative<TokenRCurBrace>(token)) {
+    return "R_CURLY_BRACE";
   } else if (std::holds_alternative<TokenComma>(token)) {
     return "COMMA";
+  } else if (std::holds_alternative<TokenColon>(token)) {
+    return "COLON";
+  } else if (std::holds_alternative<TokenRArrow>(token)) {
+    return "R_ARROW";
   } else if (std::holds_alternative<TokenPlus>(token)) {
     return "PLUS";
   } else if (std::holds_alternative<TokenMinus>(token)) {
@@ -25,6 +33,8 @@ std::string printToken(const Token &token) {
   } else if (std::holds_alternative<TokenIntLiteral>(token)) {
     const auto &intLiteral = std::get<TokenIntLiteral>(token);
     return "(INT_LITERAL " + std::to_string(intLiteral.value) + ")";
+  } else if (std::holds_alternative<TokenKwFn>(token)) {
+    return "FN";
   }
 
   std::cerr << "Unexpected token type! Index: " << token.index() << std::endl;

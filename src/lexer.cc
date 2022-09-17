@@ -4,10 +4,17 @@
 #include <charconv>
 #include <iostream>
 #include <optional>
+#include <tuple>
 
 #include "strings.h"
 
 namespace {
+
+std::pair<std::string_view, std::string_view> cut(std::string_view input,
+                                                  size_t pos) {
+  auto lenFirst = std::min(pos, input.size());
+  return {input.substr(0, lenFirst), input.substr(lenFirst)};
+}
 
 std::pair<std::optional<TokenStringLiteral>, std::string_view>
 consumeStringLiteral(std::string_view input) {
@@ -58,8 +65,8 @@ consumeIntLiteral(std::string_view input) {
   return {token, inputTail};
 }
 
-std::pair<std::optional<TokenIdentifier>, std::string_view>
-consumeIdentifier(std::string_view input) {
+std::pair<std::optional<Token>, std::string_view>
+consumeIdentifierOrKeyword(std::string_view input) {
   assert(!input.empty());
 
   constexpr auto isIdentifierChar = [](const char c) -> bool {
@@ -79,8 +86,14 @@ consumeIdentifier(std::string_view input) {
 
   assert(len > 0);
 
-  auto token = TokenIdentifier{.name = input.substr(0, len)};
-  return {token, input.substr(len)};
+  auto tokenVal = std::string_view{};
+  std::tie(tokenVal, input) = cut(input, len);
+
+  if (tokenVal == "fn") {
+    return {TokenKwFn{}, input};
+  } else {
+    return {TokenIdentifier{.name = tokenVal}, input};
+  }
 }
 
 std::pair<std::optional<Token>, std::string_view>
@@ -100,6 +113,14 @@ consumeOneToken(std::string_view input) {
     return {TokenRBrace{}, input.substr(1)};
   }
 
+  if (front == '{') {
+    return {TokenLCurBrace{}, input.substr(1)};
+  }
+
+  if (front == '}') {
+    return {TokenRCurBrace{}, input.substr(1)};
+  }
+
   if (front == ',') {
     return {TokenComma{}, input.substr(1)};
   }
@@ -108,14 +129,20 @@ consumeOneToken(std::string_view input) {
     return {TokenPlus{}, input.substr(1)};
   }
 
+  if (input.size() >= 2 && input.starts_with("->")) {
+    return {TokenRArrow{}, input.substr(2)};
+  }
+
   if (front == '-') {
     return {TokenMinus{}, input.substr(1)};
   }
 
-  if (front == ':' && input.size() >= 2) {
-    if (input[1] == '=') {
-      return {TokenAssignment{}, input.substr(2)};
-    }
+  if (input.size() >= 2 && input.starts_with(":=")) {
+    return {TokenAssignment{}, input.substr(2)};
+  }
+
+  if (front == ':') {
+    return {TokenColon{}, input.substr(1)};
   }
 
   if (front == '"') {
@@ -126,7 +153,7 @@ consumeOneToken(std::string_view input) {
     return consumeIntLiteral(input);
   }
 
-  return consumeIdentifier(input);
+  return consumeIdentifierOrKeyword(input);
 }
 
 } // namespace
