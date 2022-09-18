@@ -101,6 +101,12 @@ std::string writeTemporaryAssignment(std::ostream &output,
     return writeDecl("-" + rhs);
   }
 
+  if (const auto funcDef = to<AstNodeFuncDef>(expr)) {
+    std::cerr << "Generating function definitions is not supported yet."
+              << std::endl;
+    return writeDecl("nullptr");
+  }
+
   std::cerr << "Unexpected expression type: " << expr.index() << std::endl;
   assert(false);
 }

@@ -76,6 +76,12 @@ std::optional<Type> getExpressionType(const AstNodeExpr &expr,
     return type::I64{};
   }
 
+  if (std::holds_alternative<AstNodeFuncDef>(expr)) {
+    std::cerr << "Cannot determine the return type of a user-declared function."
+              << std::endl;
+    return {};
+  }
+
   std::cerr << "Unexpected expression type!" << std::endl;
   assert(false);
 }

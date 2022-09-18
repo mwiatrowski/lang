@@ -43,6 +43,118 @@ template <typename TokenType> TokensSpan consumeUntil(TokensSpan tokens) {
 std::pair<std::optional<AstNodeExpr>, TokensSpan>
 consumeExpression(TokensSpan tokens);
 
+std::pair<std::optional<AstNodeStmt>, TokensSpan>
+consumeStatement(TokensSpan tokens);
+
+using TypedArgList = decltype(AstNodeFuncDef::arguments);
+
+std::pair<std::optional<TypedArgList>, TokensSpan>
+consumeTypedArgList(TokensSpan tokens) {
+  if (!peek<TokenLBrace>(tokens)) {
+    std::cerr << "Expected an opening brace." << std::endl;
+    return {{}, tokens};
+  }
+  std::tie(std::ignore, tokens) = consume<TokenLBrace>(tokens);
+
+  if (peek<TokenRBrace>(tokens)) {
+    std::tie(std::ignore, tokens) = consume<TokenRBrace>(tokens);
+    return {TypedArgList{}, tokens};
+  }
+
+  auto args = TypedArgList{};
+  while (!tokens.empty()) {
+    if (!peek<TokenIdentifier, TokenColon, TokenIdentifier>(tokens)) {
+      std::cerr << "Expected the name of the argument and its type."
+                << std::endl;
+      return {{}, consumeUntil<TokenRBrace>(tokens)};
+    }
+
+    auto argName = TokenIdentifier{};
+    auto argType = TokenIdentifier{};
+    std::tie(argName, tokens) = consume<TokenIdentifier>(tokens);
+    std::tie(std::ignore, tokens) = consume<TokenColon>(tokens);
+    std::tie(argType, tokens) = consume<TokenIdentifier>(tokens);
+
+    args.emplace_back(std::move(argName), std::move(argType));
+
+    if (peek<TokenComma>(tokens)) {
+      std::tie(std::ignore, tokens) = consume<TokenComma>(tokens);
+      continue;
+    }
+
+    if (peek<TokenRBrace>(tokens)) {
+      std::tie(std::ignore, tokens) = consume<TokenRBrace>(tokens);
+      return {std::move(args), tokens};
+    }
+
+    std::cerr << "Expected either a comma or a closing brace!" << std::endl;
+    return {{}, consumeUntil<TokenRBrace>(tokens)};
+  }
+
+  assert(tokens.empty());
+  std::cerr << "Expected more tokens!" << std::endl;
+  return {{}, {}};
+}
+
+std::pair<std::optional<AstNodeFuncDef>, TokensSpan>
+consumeFunctionDefinition(TokensSpan tokens) {
+  if (!peek<TokenKwFn>(tokens)) {
+    std::cerr << "Expected a function definition." << std::endl;
+    return {{}, tokens};
+  }
+  std::tie(std::ignore, tokens) = consume<TokenKwFn>(tokens);
+
+  auto funcArgs = std::optional<TypedArgList>{};
+  std::tie(funcArgs, tokens) = consumeTypedArgList(tokens);
+  if (!funcArgs) {
+    std::cerr << "Expected a list of arguments." << std::endl;
+    return {{}, tokens};
+  }
+
+  if (!peek<TokenRArrow>(tokens)) {
+    std::cerr << "Expected a right arrow." << std::endl;
+    return {{}, tokens};
+  }
+  std::tie(std::ignore, tokens) = consume<TokenRArrow>(tokens);
+
+  auto funcRetVals = std::optional<TypedArgList>{};
+  std::tie(funcRetVals, tokens) = consumeTypedArgList(tokens);
+  if (!funcRetVals) {
+    std::cerr << "Expected a list of return values." << std::endl;
+    return {{}, tokens};
+  }
+
+  if (!peek<TokenLCurBrace>(tokens)) {
+    std::cerr << "Expected a curly opening brace." << std::endl;
+    return {{}, tokens};
+  }
+  std::tie(std::ignore, tokens) = consume<TokenLCurBrace>(tokens);
+
+  auto funcBody = std::vector<AstNodeStmt>{};
+  do {
+    if (peek<TokenRCurBrace>(tokens)) {
+      std::tie(std::ignore, tokens) = consume<TokenRCurBrace>(tokens);
+
+      auto funcDef = AstNodeFuncDef{.arguments = std::move(*funcArgs),
+                                    .returnVals = std::move(*funcRetVals),
+                                    .functionBody = std::move(funcBody)};
+      return {std::move(funcDef), tokens};
+    }
+
+    auto stmt = std::optional<AstNodeStmt>{};
+    std::tie(stmt, tokens) = consumeStatement(tokens);
+    if (!stmt) {
+      std::cerr << "Expected a statement." << std::endl;
+      return {{}, consumeUntil<TokenRCurBrace>(tokens)};
+    }
+
+    funcBody.push_back(std::move(*stmt));
+  } while (!tokens.empty());
+
+  std::cerr << "Expected more tokens!" << std::endl;
+  return {{}, {}};
+}
+
 std::pair<std::optional<AstNodeFuncCall>, TokensSpan>
 consumeFunctionCall(TokensSpan tokens) {
   if (!peek<TokenIdentifier, TokenLBrace>(tokens)) {
@@ -143,6 +255,13 @@ consumeBasicExpression(TokensSpan tokens) {
     return {AstNodeExpr{std::move(negation)}, tokens};
   }
 
+  if (peek<TokenKwFn>(tokens)) {
+    auto [funcDef, tokensTail] = consumeFunctionDefinition(tokens);
+    auto expr = funcDef.has_value() ? std::optional<AstNodeExpr>{*funcDef}
+                                    : std::optional<AstNodeExpr>{};
+    return {expr, tokensTail};
+  }
+
   std::cerr << "Failed to parse any expression" << std::endl;
   return {{}, tokens};
 }
@@ -232,7 +351,7 @@ consumeAssignment(TokensSpan tokens) {
 
   auto assignment = AstNodeAssignment{.variable = std::move(*variable),
                                       .value = std::move(*expr)};
-  return {std::move(assignment), tokens};
+  return {AstNodeStmt{std::move(assignment)}, tokens};
 }
 
 std::pair<std::optional<AstNodeStmt>, TokensSpan>
@@ -240,7 +359,13 @@ consumeStatement(TokensSpan tokens) {
   if (peek<TokenIdentifier, TokenAssignment>(tokens)) {
     return consumeAssignment(tokens);
   } else if (peek<TokenIdentifier, TokenLBrace>(tokens)) {
-    return consumeFunctionCall(tokens);
+    auto funcCall = std::optional<AstNodeFuncCall>{};
+    std::tie(funcCall, tokens) = consumeFunctionCall(tokens);
+    if (!funcCall) {
+      return {{}, tokens};
+    }
+    auto stmt = AstNodeStmt{*funcCall};
+    return {std::move(stmt), tokens};
   }
 
   std::cerr << "Failed to parse a statement" << std::endl;

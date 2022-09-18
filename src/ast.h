@@ -7,6 +7,7 @@
 #include "tokens.h"
 
 struct AstNodeExpr;
+struct AstNodeStmt;
 
 struct AstNodeIntLiteral {
   TokenIntLiteral value;
@@ -34,17 +35,26 @@ struct AstNodeNegation {
   std::vector<AstNodeExpr> operands; // size 1
 };
 
+struct AstNodeFuncDef {
+  std::vector<std::pair<TokenIdentifier, TokenIdentifier>> arguments;
+  std::vector<std::pair<TokenIdentifier, TokenIdentifier>> returnVals;
+  std::vector<AstNodeStmt> functionBody;
+};
+
 struct AstNodeExpr
     : public std::variant<AstNodeIntLiteral, AstNodeStringLiteral,
                           AstNodeIdentifier, AstNodeFuncCall, AstNodeAddition,
-                          AstNodeSubstraction, AstNodeNegation> {};
+                          AstNodeSubstraction, AstNodeNegation,
+                          AstNodeFuncDef> {};
 
 struct AstNodeAssignment {
   TokenIdentifier variable;
   AstNodeExpr value;
 };
 
-using AstNodeStmt = std::variant<AstNodeAssignment, AstNodeFuncCall>;
+struct AstNodeStmt : public std::variant<AstNodeAssignment, AstNodeFuncCall> {
+  using std::variant<AstNodeAssignment, AstNodeFuncCall>::variant;
+};
 
 using AstNode = AstNodeStmt;
 

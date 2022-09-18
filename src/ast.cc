@@ -5,6 +5,12 @@
 #include <sstream>
 #include <string>
 
+#include "variant_helpers.h"
+
+namespace {
+
+std::string printStatement(const AstNodeStmt &stmt);
+
 std::string printExpression(const AstNodeExpr &expr) {
   if (std::holds_alternative<AstNodeIntLiteral>(expr)) {
     auto literal = std::get<AstNodeIntLiteral>(expr);
@@ -41,6 +47,22 @@ std::string printExpression(const AstNodeExpr &expr) {
     const auto &operands = negation.operands;
     assert(operands.size() == 1);
     return "( - " + printExpression(operands[0]) + ")";
+  } else if (const auto funcDecl = to<AstNodeFuncDef>(expr)) {
+    auto out = std::stringstream{};
+    out << "(FUNCTION ARGS (";
+    for (const auto &[argName, argType] : funcDecl->arguments) {
+      out << " (ARG " << argName.name << " TYPE " << argType.name << ")";
+    }
+    out << ") RETURN_VALUES (";
+    for (const auto &[retName, retType] : funcDecl->returnVals) {
+      out << " (RET_VAL " << retName.name << " TYPE " << retType.name << ")";
+    }
+    out << ") BEGIN\n";
+    for (const auto &fnStmt : funcDecl->functionBody) {
+      out << printStatement(fnStmt) << "\n";
+    }
+    out << "END";
+    return out.str();
   }
 
   std::cerr << "Unexpected expression type! Index: " << expr.index()
@@ -62,6 +84,8 @@ std::string printStatement(const AstNodeStmt &stmt) {
             << std::endl;
   assert(false);
 }
+
+} // namespace
 
 std::string printAst(const Ast &ast) {
   auto stream = std::stringstream{};
