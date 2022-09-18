@@ -10,50 +10,47 @@ struct AstNodeExpr;
 struct AstNodeStmt;
 
 struct AstNodeIntLiteral {
-  TokenIntLiteral value;
+    TokenIntLiteral value;
 };
 struct AstNodeStringLiteral {
-  TokenStringLiteral value;
+    TokenStringLiteral value;
 };
 struct AstNodeIdentifier {
-  TokenIdentifier value;
+    TokenIdentifier value;
 };
 struct AstNodeFuncCall {
-  TokenIdentifier functionName;
-  std::vector<AstNodeExpr> arguments;
+    TokenIdentifier functionName;
+    std::vector<AstNodeExpr> arguments;
 };
 
 struct AstNodeAddition {
-  std::vector<AstNodeExpr> operands; // size 2
+    std::vector<AstNodeExpr> operands; // size 2
 };
 
 struct AstNodeSubstraction {
-  std::vector<AstNodeExpr> operands; // size 2
+    std::vector<AstNodeExpr> operands; // size 2
 };
 
 struct AstNodeNegation {
-  std::vector<AstNodeExpr> operands; // size 1
+    std::vector<AstNodeExpr> operands; // size 1
 };
 
 struct AstNodeFuncDef {
-  std::vector<std::pair<TokenIdentifier, TokenIdentifier>> arguments;
-  std::vector<std::pair<TokenIdentifier, TokenIdentifier>> returnVals;
-  std::vector<AstNodeStmt> functionBody;
+    std::vector<std::pair<TokenIdentifier, TokenIdentifier>> arguments;
+    std::vector<std::pair<TokenIdentifier, TokenIdentifier>> returnVals;
+    std::vector<AstNodeStmt> functionBody;
 };
 
-struct AstNodeExpr
-    : public std::variant<AstNodeIntLiteral, AstNodeStringLiteral,
-                          AstNodeIdentifier, AstNodeFuncCall, AstNodeAddition,
-                          AstNodeSubstraction, AstNodeNegation,
-                          AstNodeFuncDef> {};
+struct AstNodeExpr : public std::variant<AstNodeIntLiteral, AstNodeStringLiteral, AstNodeIdentifier, AstNodeFuncCall,
+                                         AstNodeAddition, AstNodeSubstraction, AstNodeNegation, AstNodeFuncDef> {};
 
 struct AstNodeAssignment {
-  TokenIdentifier variable;
-  AstNodeExpr value;
+    TokenIdentifier variable;
+    AstNodeExpr value;
 };
 
 struct AstNodeStmt : public std::variant<AstNodeAssignment, AstNodeFuncCall> {
-  using std::variant<AstNodeAssignment, AstNodeFuncCall>::variant;
+    using std::variant<AstNodeAssignment, AstNodeFuncCall>::variant;
 };
 
 using AstNode = AstNodeStmt;

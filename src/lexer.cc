@@ -10,172 +10,163 @@
 
 namespace {
 
-std::pair<std::string_view, std::string_view> cut(std::string_view input,
-                                                  size_t pos) {
-  auto lenFirst = std::min(pos, input.size());
-  return {input.substr(0, lenFirst), input.substr(lenFirst)};
+std::pair<std::string_view, std::string_view> cut(std::string_view input, size_t pos) {
+    auto lenFirst = std::min(pos, input.size());
+    return {input.substr(0, lenFirst), input.substr(lenFirst)};
 }
 
-std::pair<std::optional<TokenStringLiteral>, std::string_view>
-consumeStringLiteral(std::string_view input) {
-  assert(!input.empty());
-  assert(input.at(0) == '"');
+std::pair<std::optional<TokenStringLiteral>, std::string_view> consumeStringLiteral(std::string_view input) {
+    assert(!input.empty());
+    assert(input.at(0) == '"');
 
-  auto end = input.find_first_of("\"\n", 1);
+    auto end = input.find_first_of("\"\n", 1);
 
-  if (end == std::string::npos) {
-    std::cerr << "Unterminated string literal!" << std::endl;
-    return {{}, std::string_view{}};
-  }
+    if (end == std::string::npos) {
+        std::cerr << "Unterminated string literal!" << std::endl;
+        return {{}, std::string_view{}};
+    }
 
-  if (input.at(end) == '\n') {
-    std::cerr << "Unterminated string literal!" << std::endl;
-    return {{}, input.substr(end + 1)};
-  }
+    if (input.at(end) == '\n') {
+        std::cerr << "Unterminated string literal!" << std::endl;
+        return {{}, input.substr(end + 1)};
+    }
 
-  auto newToken = TokenStringLiteral{.value = input.substr(1, end - 1)};
-  return {newToken, input.substr(end + 1)};
+    auto newToken = TokenStringLiteral{.value = input.substr(1, end - 1)};
+    return {newToken, input.substr(end + 1)};
 }
 
-std::pair<std::optional<TokenIntLiteral>, std::string_view>
-consumeIntLiteral(std::string_view input) {
-  assert(!input.empty());
-  assert(std::isdigit(input.at(0)));
+std::pair<std::optional<TokenIntLiteral>, std::string_view> consumeIntLiteral(std::string_view input) {
+    assert(!input.empty());
+    assert(std::isdigit(input.at(0)));
 
-  auto len = size_t{0};
-  while (len < input.size() && std::isdigit(input.at(len))) {
-    len += 1;
-  }
+    auto len = size_t{0};
+    while (len < input.size() && std::isdigit(input.at(len))) {
+        len += 1;
+    }
 
-  assert(len > 0);
+    assert(len > 0);
 
-  auto value = int64_t{};
-  auto numStr = input.substr(0, len);
-  auto [matchEnd, error] = std::from_chars(numStr.begin(), numStr.end(), value);
+    auto value = int64_t{};
+    auto numStr = input.substr(0, len);
+    auto [matchEnd, error] = std::from_chars(numStr.begin(), numStr.end(), value);
 
-  auto consumedInputLen = std::distance(numStr.begin(), matchEnd);
-  auto inputTail = input.substr(consumedInputLen);
+    auto consumedInputLen = std::distance(numStr.begin(), matchEnd);
+    auto inputTail = input.substr(consumedInputLen);
 
-  if (error != std::errc{}) {
-    std::cerr << "Couldn't parse the integer literal: " << numStr << std::endl;
-    return {{}, inputTail};
-  }
+    if (error != std::errc{}) {
+        std::cerr << "Couldn't parse the integer literal: " << numStr << std::endl;
+        return {{}, inputTail};
+    }
 
-  auto token = TokenIntLiteral{.value = value};
-  return {token, inputTail};
+    auto token = TokenIntLiteral{.value = value};
+    return {token, inputTail};
 }
 
-std::pair<std::optional<Token>, std::string_view>
-consumeIdentifierOrKeyword(std::string_view input) {
-  assert(!input.empty());
+std::pair<std::optional<Token>, std::string_view> consumeIdentifierOrKeyword(std::string_view input) {
+    assert(!input.empty());
 
-  constexpr auto isIdentifierChar = [](const char c) -> bool {
-    return std::isalnum(c) || (c == '_');
-  };
+    constexpr auto isIdentifierChar = [](const char c) -> bool { return std::isalnum(c) || (c == '_'); };
 
-  if (!isIdentifierChar(input.front())) {
-    std::cerr << "Not a valid character for identifier: " << input.front()
-              << std::endl;
-    return {{}, input};
-  }
+    if (!isIdentifierChar(input.front())) {
+        std::cerr << "Not a valid character for identifier: " << input.front() << std::endl;
+        return {{}, input};
+    }
 
-  auto len = size_t{0};
-  while (len < input.size() && isIdentifierChar(input.at(len))) {
-    len += 1;
-  }
+    auto len = size_t{0};
+    while (len < input.size() && isIdentifierChar(input.at(len))) {
+        len += 1;
+    }
 
-  assert(len > 0);
+    assert(len > 0);
 
-  auto tokenVal = std::string_view{};
-  std::tie(tokenVal, input) = cut(input, len);
+    auto tokenVal = std::string_view{};
+    std::tie(tokenVal, input) = cut(input, len);
 
-  if (tokenVal == "fn") {
-    return {TokenKwFn{}, input};
-  } else {
-    return {TokenIdentifier{.name = tokenVal}, input};
-  }
+    if (tokenVal == "fn") {
+        return {TokenKwFn{}, input};
+    } else {
+        return {TokenIdentifier{.name = tokenVal}, input};
+    }
 }
 
-std::pair<std::optional<Token>, std::string_view>
-consumeOneToken(std::string_view input) {
-  input = consumeWhitespace(input);
-  if (input.empty()) {
-    return {{}, input};
-  }
+std::pair<std::optional<Token>, std::string_view> consumeOneToken(std::string_view input) {
+    input = consumeWhitespace(input);
+    if (input.empty()) {
+        return {{}, input};
+    }
 
-  const char front = input.front();
+    const char front = input.front();
 
-  if (front == '(') {
-    return {TokenLBrace{}, input.substr(1)};
-  }
+    if (front == '(') {
+        return {TokenLBrace{}, input.substr(1)};
+    }
 
-  if (front == ')') {
-    return {TokenRBrace{}, input.substr(1)};
-  }
+    if (front == ')') {
+        return {TokenRBrace{}, input.substr(1)};
+    }
 
-  if (front == '{') {
-    return {TokenLCurBrace{}, input.substr(1)};
-  }
+    if (front == '{') {
+        return {TokenLCurBrace{}, input.substr(1)};
+    }
 
-  if (front == '}') {
-    return {TokenRCurBrace{}, input.substr(1)};
-  }
+    if (front == '}') {
+        return {TokenRCurBrace{}, input.substr(1)};
+    }
 
-  if (front == ',') {
-    return {TokenComma{}, input.substr(1)};
-  }
+    if (front == ',') {
+        return {TokenComma{}, input.substr(1)};
+    }
 
-  if (front == '+') {
-    return {TokenPlus{}, input.substr(1)};
-  }
+    if (front == '+') {
+        return {TokenPlus{}, input.substr(1)};
+    }
 
-  if (input.size() >= 2 && input.starts_with("->")) {
-    return {TokenRArrow{}, input.substr(2)};
-  }
+    if (input.size() >= 2 && input.starts_with("->")) {
+        return {TokenRArrow{}, input.substr(2)};
+    }
 
-  if (front == '-') {
-    return {TokenMinus{}, input.substr(1)};
-  }
+    if (front == '-') {
+        return {TokenMinus{}, input.substr(1)};
+    }
 
-  if (input.size() >= 2 && input.starts_with(":=")) {
-    return {TokenAssignment{}, input.substr(2)};
-  }
+    if (input.size() >= 2 && input.starts_with(":=")) {
+        return {TokenAssignment{}, input.substr(2)};
+    }
 
-  if (front == ':') {
-    return {TokenColon{}, input.substr(1)};
-  }
+    if (front == ':') {
+        return {TokenColon{}, input.substr(1)};
+    }
 
-  if (front == '"') {
-    return consumeStringLiteral(input);
-  }
+    if (front == '"') {
+        return consumeStringLiteral(input);
+    }
 
-  if (std::isdigit(front)) {
-    return consumeIntLiteral(input);
-  }
+    if (std::isdigit(front)) {
+        return consumeIntLiteral(input);
+    }
 
-  return consumeIdentifierOrKeyword(input);
+    return consumeIdentifierOrKeyword(input);
 }
 
 } // namespace
 
 std::vector<Token> lexSourceCode(std::string_view input) {
-  auto tokens = std::vector<Token>{};
+    auto tokens = std::vector<Token>{};
 
-  while (!input.empty()) {
-    auto [token, inputTail] = consumeOneToken(input);
+    while (!input.empty()) {
+        auto [token, inputTail] = consumeOneToken(input);
 
-    if (input.size() == inputTail.size()) {
-      std::cerr << "Failed to consume any input! Removing one character from "
-                   "the input.";
-      input.remove_prefix(1);
-    } else {
-      input = inputTail;
+        if (input.size() == inputTail.size()) {
+            std::cerr << "Failed to consume any input! Removing one character from the input." << std::endl;
+            input.remove_prefix(1);
+        } else {
+            input = inputTail;
+        }
+
+        if (token.has_value()) {
+            tokens.push_back(*token);
+        }
     }
 
-    if (token.has_value()) {
-      tokens.push_back(*token);
-    }
-  }
-
-  return tokens;
+    return tokens;
 }

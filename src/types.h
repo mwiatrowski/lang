@@ -8,11 +8,11 @@
 namespace type {
 
 struct I64 {
-  auto operator<=>(const I64 &) const = default;
+    auto operator<=>(const I64 &) const = default;
 };
 
 struct String {
-  auto operator<=>(const String &) const = default;
+    auto operator<=>(const String &) const = default;
 };
 
 } // namespace type
