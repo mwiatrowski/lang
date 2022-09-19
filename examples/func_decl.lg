@@ -1,4 +1,4 @@
-fun := fn (x: _, y: _, z: _) -> (a: _, b: _) {
+fun := fn (x: int, y: int, z: str) -> (a: int, b: str) {
     a := x + y
     b := z
 }

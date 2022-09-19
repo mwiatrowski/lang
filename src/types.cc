@@ -3,10 +3,26 @@
 #include <cassert>
 #include <iostream>
 #include <optional>
+#include <sstream>
+
+#include "variant_helpers.h"
 
 namespace {
 
-std::optional<Type> getExpressionType(const AstNodeExpr &expr, const TypeInfo &typeInfo) {
+std::optional<type::Type> getTypeFromName(std::string_view name) {
+    if (name == "int") {
+        return type::I64{};
+    }
+
+    if (name == "str") {
+        return type::String{};
+    }
+
+    std::cerr << "Unknown type: " << name << std::endl;
+    return {};
+}
+
+std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, const TypeInfo &typeInfo) {
     if (std::holds_alternative<AstNodeIntLiteral>(expr)) {
         return type::I64{};
     }
@@ -22,7 +38,7 @@ std::optional<Type> getExpressionType(const AstNodeExpr &expr, const TypeInfo &t
             std::cerr << "Type of " << name << " cannot be determined." << std::endl;
             return {};
         }
-        return typeInfo.at(name);
+        return type::Type{typeInfo.at(name)};
     }
 
     if (std::holds_alternative<AstNodeFuncCall>(expr)) {
@@ -43,7 +59,7 @@ std::optional<Type> getExpressionType(const AstNodeExpr &expr, const TypeInfo &t
             std::cerr << "Types of operands in addition don't match!" << std::endl;
             return {};
         }
-        return *lhsType;
+        return type::Type{std::move(*lhsType)};
     }
 
     if (std::holds_alternative<AstNodeSubstraction>(expr)) {
@@ -71,9 +87,28 @@ std::optional<Type> getExpressionType(const AstNodeExpr &expr, const TypeInfo &t
         return type::I64{};
     }
 
-    if (std::holds_alternative<AstNodeFuncDef>(expr)) {
-        std::cerr << "Cannot determine the return type of a user-declared function." << std::endl;
-        return {};
+    if (const auto &fnDef = to<AstNodeFuncDef>(expr)) {
+        auto argTypes = std::vector<type::Type>{};
+        for (const auto &[argName, argType] : fnDef->arguments) {
+            if (auto type = getTypeFromName(argType.name)) {
+                argTypes.push_back(*type);
+            } else {
+                std::cerr << "Couldn't determine types of arguments." << std::endl;
+                return {};
+            }
+        }
+
+        auto retValTypes = std::vector<type::Type>{};
+        for (const auto &[retValName, retValType] : fnDef->returnVals) {
+            if (auto type = getTypeFromName(retValType.name)) {
+                retValTypes.push_back(*type);
+            } else {
+                std::cerr << "Couldn't determine types of return values." << std::endl;
+                return {};
+            }
+        }
+
+        return type::Function{.inputTypes = std::move(argTypes), .returnTypes = std::move(retValTypes)};
     }
 
     std::cerr << "Unexpected expression type!" << std::endl;
@@ -82,11 +117,23 @@ std::optional<Type> getExpressionType(const AstNodeExpr &expr, const TypeInfo &t
 
 } // namespace
 
-std::string printType(const Type &type) {
+std::string printType(const type::Type &type) {
     if (std::holds_alternative<type::I64>(type)) {
         return "i64";
     } else if (std::holds_alternative<type::String>(type)) {
         return "string";
+    } else if (const auto &func = to<type::Function>(type)) {
+        auto out = std::stringstream{};
+        out << "(FUNCTION ( ";
+        for (const auto &argType : func->inputTypes) {
+            out << printType(argType) << " ";
+        }
+        out << ") -> ( ";
+        for (const auto &retType : func->returnTypes) {
+            out << printType(retType) << " ";
+        }
+        out << "))";
+        return out.str();
     }
 
     std::cerr << "Unexpected type, index: " << type.index() << std::endl;
