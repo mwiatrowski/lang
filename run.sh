@@ -11,12 +11,14 @@ make &&
 
 for SOURCE in ../examples/*.lg; do
     FULL_PATH=`realpath $SOURCE`
+    FILENAME=`basename $SOURCE`
+
     echo -e "${L_GREEN}=== Example: $FULL_PATH ===${NC}"
 
     echo -e "${CYAN}Running the compiler${NC}" &&
     ./lang $FULL_PATH &&
     echo -e "${CYAN}Running GCC on the transpiled output${NC}" &&
-    g++ transpiled.cc -o compiled.out &&
+    g++ "${FILENAME}.transpiled.cc" -o compiled.out &&
     echo -e "${CYAN}Running the compiled program${NC}" &&
     ./compiled.out
 done

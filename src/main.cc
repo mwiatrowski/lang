@@ -1,3 +1,4 @@
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -9,9 +10,7 @@
 
 namespace {
 
-constexpr auto *OUTPUT_FILE = "transpiled.cc";
-
-void startCompilation(const std::string &rootSourceFile, const std::string &outputFile) {
+void startCompilation(const std::filesystem::path &rootSourceFile, const std::filesystem::path &outputFile) {
     auto sourceStream = std::ifstream(rootSourceFile, std::ios::in);
     auto sourceFileContents =
         std::string(std::istreambuf_iterator<char>(sourceStream), std::istreambuf_iterator<char>());
@@ -33,8 +32,9 @@ int main(int argc, char *argv[]) {
         return {};
     }
 
-    auto sourceFile = std::string{argv[1]};
+    auto sourceFile = std::filesystem::path{argv[1]};
     std::cerr << "Compiling " << sourceFile << std::endl;
 
-    startCompilation(sourceFile, OUTPUT_FILE);
+    auto outputFile = sourceFile.filename().string() + ".transpiled.cc";
+    startCompilation(sourceFile, outputFile);
 }
