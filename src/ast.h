@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 
@@ -35,14 +36,12 @@ struct AstNodeNegation {
     std::vector<AstNodeExpr> operands; // size 1
 };
 
-struct AstNodeFuncDef {
-    std::vector<std::pair<TokenIdentifier, TokenIdentifier>> arguments;
-    std::vector<std::pair<TokenIdentifier, TokenIdentifier>> returnVals;
-    std::vector<AstNodeStmt> functionBody;
+struct AstNodeFuncRef {
+    std::string generatedName;
 };
 
 struct AstNodeExpr : public std::variant<AstNodeIntLiteral, AstNodeStringLiteral, AstNodeIdentifier, AstNodeFuncCall,
-                                         AstNodeAddition, AstNodeSubstraction, AstNodeNegation, AstNodeFuncDef> {};
+                                         AstNodeAddition, AstNodeSubstraction, AstNodeNegation, AstNodeFuncRef> {};
 
 struct AstNodeAssignment {
     TokenIdentifier variable;
@@ -53,8 +52,14 @@ struct AstNodeStmt : public std::variant<AstNodeAssignment, AstNodeFuncCall> {
     using std::variant<AstNodeAssignment, AstNodeFuncCall>::variant;
 };
 
-using AstNode = AstNodeStmt;
+using Ast = std::vector<AstNodeStmt>;
 
-using Ast = std::vector<AstNode>;
+struct FunctionDefinition {
+    std::vector<std::pair<TokenIdentifier, TokenIdentifier>> arguments;
+    std::vector<std::pair<TokenIdentifier, TokenIdentifier>> returnVals;
+    std::vector<AstNodeStmt> functionBody;
+};
 
-std::string printAst(const Ast &ast);
+using FuncDefs = std::unordered_map<std::string, FunctionDefinition>;
+
+std::string printAst(Ast const &ast, FuncDefs const &functions);

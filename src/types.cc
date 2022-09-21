@@ -22,7 +22,8 @@ std::optional<type::Type> getTypeFromName(std::string_view name) {
     return {};
 }
 
-std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, const TypeInfo &typeInfo) {
+std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, const TypeInfo &typeInfo,
+                                            const FuncDefs &funcDefs) {
     if (std::holds_alternative<AstNodeIntLiteral>(expr)) {
         return type::I64{};
     }
@@ -49,8 +50,8 @@ std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, const TypeI
 
     if (std::holds_alternative<AstNodeAddition>(expr)) {
         const auto &addition = std::get<AstNodeAddition>(expr);
-        const auto lhsType = getExpressionType(addition.operands[0], typeInfo);
-        const auto rhsType = getExpressionType(addition.operands[1], typeInfo);
+        const auto lhsType = getExpressionType(addition.operands[0], typeInfo, funcDefs);
+        const auto rhsType = getExpressionType(addition.operands[1], typeInfo, funcDefs);
         if (!lhsType || !rhsType) {
             std::cerr << "Couldn't determine the type of one of the operands." << std::endl;
             return {};
@@ -64,8 +65,8 @@ std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, const TypeI
 
     if (std::holds_alternative<AstNodeSubstraction>(expr)) {
         const auto &substraction = std::get<AstNodeSubstraction>(expr);
-        const auto lhsType = getExpressionType(substraction.operands[0], typeInfo);
-        const auto rhsType = getExpressionType(substraction.operands[1], typeInfo);
+        const auto lhsType = getExpressionType(substraction.operands[0], typeInfo, funcDefs);
+        const auto rhsType = getExpressionType(substraction.operands[1], typeInfo, funcDefs);
         if (!lhsType || !rhsType) {
             std::cerr << "Couldn't determine the type of one of the operands." << std::endl;
             return {};
@@ -79,7 +80,7 @@ std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, const TypeI
 
     if (std::holds_alternative<AstNodeNegation>(expr)) {
         const auto &negation = std::get<AstNodeNegation>(expr);
-        const auto type = getExpressionType(negation.operands[0], typeInfo);
+        const auto type = getExpressionType(negation.operands[0], typeInfo, funcDefs);
         if (!type || !std::holds_alternative<type::I64>(*type)) {
             std::cerr << "Type of the expression is not integer." << std::endl;
             return {};
@@ -87,9 +88,13 @@ std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, const TypeI
         return type::I64{};
     }
 
-    if (const auto &fnDef = to<AstNodeFuncDef>(expr)) {
+    if (const auto &fnRef = to<AstNodeFuncRef>(expr)) {
+        auto it = funcDefs.find(fnRef->generatedName);
+        assert(it != funcDefs.end());
+        const auto &fnDef = it->second;
+
         auto argTypes = std::vector<type::Type>{};
-        for (const auto &[argName, argType] : fnDef->arguments) {
+        for (const auto &[argName, argType] : fnDef.arguments) {
             if (auto type = getTypeFromName(argType.name)) {
                 argTypes.push_back(*type);
             } else {
@@ -99,7 +104,7 @@ std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, const TypeI
         }
 
         auto retValTypes = std::vector<type::Type>{};
-        for (const auto &[retValName, retValType] : fnDef->returnVals) {
+        for (const auto &[retValName, retValType] : fnDef.returnVals) {
             if (auto type = getTypeFromName(retValType.name)) {
                 retValTypes.push_back(*type);
             } else {
@@ -140,15 +145,15 @@ std::string printType(const type::Type &type) {
     assert(false);
 }
 
-TypeInfo resolveTypes(const Ast &ast) {
+TypeInfo resolveTypes(const ParserOutput &parserOutput) {
     auto types = TypeInfo{};
 
-    for (const auto &stmt : ast) {
+    for (const auto &stmt : parserOutput.ast) {
         if (std::holds_alternative<AstNodeAssignment>(stmt)) {
             auto assignment = std::get<AstNodeAssignment>(stmt);
             const auto &name = assignment.variable.name;
 
-            auto type = getExpressionType(assignment.value, types);
+            auto type = getExpressionType(assignment.value, types, parserOutput.functions);
             if (!type) {
                 std::cerr << "Can't determine the type of " << name << std::endl;
                 continue;

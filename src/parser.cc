@@ -39,10 +39,13 @@ template <typename TokenType> [[nodiscard]] TokensSpan consumeUntil(TokensSpan t
 
 struct ParserContext {
     TokensSpan tokens;
-    Ast ast;
+    FuncDefs functions;
+    int nextFnId{0};
 };
 
-using TypedArgList = decltype(AstNodeFuncDef::arguments);
+std::string generateNewFunctionName(ParserContext &ctx) { return "__temp_func_" + std::to_string(ctx.nextFnId++); }
+
+using TypedArgList = decltype(FunctionDefinition::arguments);
 
 std::optional<AstNodeExpr> consumeExpression(ParserContext &ctx);
 std::optional<AstNodeStmt> consumeStatement(ParserContext &ctx);
@@ -97,7 +100,7 @@ std::optional<TypedArgList> consumeTypedArgList(ParserContext &ctx) {
     return {};
 }
 
-std::optional<AstNodeFuncDef> consumeFunctionDefinition(ParserContext &ctx) {
+std::optional<AstNodeFuncRef> consumeFunctionDefinition(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
 
     if (!peek<TokenKwFn>(tokens)) {
@@ -135,9 +138,13 @@ std::optional<AstNodeFuncDef> consumeFunctionDefinition(ParserContext &ctx) {
         if (peek<TokenRCurBrace>(tokens)) {
             std::tie(std::ignore, tokens) = consume<TokenRCurBrace>(tokens);
 
-            return AstNodeFuncDef{.arguments = std::move(*funcArgs),
-                                  .returnVals = std::move(*funcRetVals),
-                                  .functionBody = std::move(funcBody)};
+            auto funcDef = FunctionDefinition{.arguments = std::move(*funcArgs),
+                                              .returnVals = std::move(*funcRetVals),
+                                              .functionBody = std::move(funcBody)};
+            auto funcName = generateNewFunctionName(ctx);
+            ctx.functions[funcName] = std::move(funcDef);
+
+            return AstNodeFuncRef{.generatedName = funcName};
         }
 
         auto stmt = consumeStatement(ctx);
@@ -352,9 +359,9 @@ std::optional<AstNodeStmt> consumeStatement(ParserContext &ctx) {
     return {};
 }
 
-void parseSourceFile(ParserContext &ctx) {
+Ast parseSourceFile(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
-    auto &ast = ctx.ast;
+    auto ast = Ast{};
 
     while (!tokens.empty()) {
         auto tokensSizeBeforeParse = tokens.size();
@@ -370,12 +377,14 @@ void parseSourceFile(ParserContext &ctx) {
             tokens = tokens.subspan(1);
         }
     }
+
+    return ast;
 }
 
 } // namespace
 
-Ast parseSourceFile(TokensSpan tokens) {
-    auto ctx = ParserContext{.tokens = tokens, .ast = {}};
-    parseSourceFile(ctx);
-    return std::move(ctx.ast);
+ParserOutput parseSourceFile(TokensSpan tokens) {
+    auto ctx = ParserContext{.tokens = tokens, .functions = {}};
+    auto ast = parseSourceFile(ctx);
+    return ParserOutput{.ast = std::move(ast), .functions = std::move(ctx.functions)};
 }

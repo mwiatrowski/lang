@@ -16,12 +16,12 @@ void startCompilation(const std::filesystem::path &rootSourceFile, const std::fi
         std::string(std::istreambuf_iterator<char>(sourceStream), std::istreambuf_iterator<char>());
 
     auto tokens = lexSourceCode(sourceFileContents);
-    auto ast = parseSourceFile(tokens);
-    auto typeInfo = resolveTypes(ast);
+    auto parserOutput = parseSourceFile(tokens);
+    auto typeInfo = resolveTypes(parserOutput);
     (void)typeInfo;
 
     auto outputStream = std::ofstream(outputFile, std::ios::out);
-    outputStream << generateCode(ast);
+    outputStream << generateCode(parserOutput.ast);
 }
 
 } // namespace

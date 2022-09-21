@@ -9,9 +9,9 @@
 
 namespace {
 
-std::string printStatement(const AstNodeStmt &stmt);
+std::string printStatement(const AstNodeStmt &stmt, const FuncDefs &functions);
 
-std::string printExpression(const AstNodeExpr &expr) {
+std::string printExpression(const AstNodeExpr &expr, const FuncDefs &functions) {
     if (std::holds_alternative<AstNodeIntLiteral>(expr)) {
         auto literal = std::get<AstNodeIntLiteral>(expr);
         return "(INT_LITERAL " + std::to_string(literal.value.value) + ")";
@@ -26,7 +26,7 @@ std::string printExpression(const AstNodeExpr &expr) {
         auto stream = std::stringstream{};
         stream << "(CALL " << funcCall.functionName.name;
         for (const auto &arg : funcCall.arguments) {
-            stream << " " << printExpression(arg);
+            stream << " " << printExpression(arg, functions);
         }
         stream << ")";
         return stream.str();
@@ -34,30 +34,34 @@ std::string printExpression(const AstNodeExpr &expr) {
         auto addition = std::get<AstNodeAddition>(expr);
         const auto &operands = addition.operands;
         assert(operands.size() == 2);
-        return "(" + printExpression(operands[0]) + " + " + printExpression(operands[1]) + ")";
+        return "(" + printExpression(operands[0], functions) + " + " + printExpression(operands[1], functions) + ")";
     } else if (std::holds_alternative<AstNodeSubstraction>(expr)) {
         auto substraction = std::get<AstNodeSubstraction>(expr);
         const auto &operands = substraction.operands;
         assert(operands.size() == 2);
-        return "(" + printExpression(operands[0]) + " - " + printExpression(operands[1]) + ")";
+        return "(" + printExpression(operands[0], functions) + " - " + printExpression(operands[1], functions) + ")";
     } else if (std::holds_alternative<AstNodeNegation>(expr)) {
         auto negation = std::get<AstNodeNegation>(expr);
         const auto &operands = negation.operands;
         assert(operands.size() == 1);
-        return "( - " + printExpression(operands[0]) + ")";
-    } else if (const auto funcDecl = to<AstNodeFuncDef>(expr)) {
+        return "( - " + printExpression(operands[0], functions) + ")";
+    } else if (const auto funcRef = to<AstNodeFuncRef>(expr)) {
+        auto it = functions.find(funcRef->generatedName);
+        assert(it != functions.end());
+        const auto &funcDef = it->second;
+
         auto out = std::stringstream{};
         out << "(FUNCTION ARGS (";
-        for (const auto &[argName, argType] : funcDecl->arguments) {
+        for (const auto &[argName, argType] : funcDef.arguments) {
             out << " (ARG " << argName.name << " TYPE " << argType.name << ")";
         }
         out << ") RETURN_VALUES (";
-        for (const auto &[retName, retType] : funcDecl->returnVals) {
+        for (const auto &[retName, retType] : funcDef.returnVals) {
             out << " (RET_VAL " << retName.name << " TYPE " << retType.name << ")";
         }
         out << ") BEGIN\n";
-        for (const auto &fnStmt : funcDecl->functionBody) {
-            out << printStatement(fnStmt) << "\n";
+        for (const auto &fnStmt : funcDef.functionBody) {
+            out << printStatement(fnStmt, functions) << "\n";
         }
         out << "END";
         return out.str();
@@ -67,13 +71,14 @@ std::string printExpression(const AstNodeExpr &expr) {
     assert(false);
 }
 
-std::string printStatement(const AstNodeStmt &stmt) {
+std::string printStatement(const AstNodeStmt &stmt, const FuncDefs &functions) {
     if (std::holds_alternative<AstNodeFuncCall>(stmt)) {
         auto funcCall = std::get<AstNodeFuncCall>(stmt);
-        return printExpression(AstNodeExpr{funcCall});
+        return printExpression(AstNodeExpr{funcCall}, functions);
     } else if (std::holds_alternative<AstNodeAssignment>(stmt)) {
         auto assignment = std::get<AstNodeAssignment>(stmt);
-        return std::string{assignment.variable.name} + " := " + printExpression(AstNodeExpr{assignment.value});
+        return std::string{assignment.variable.name} +
+               " := " + printExpression(AstNodeExpr{assignment.value}, functions);
     }
 
     std::cerr << "Unexpected statement type! Index: " << stmt.index() << std::endl;
@@ -82,12 +87,12 @@ std::string printStatement(const AstNodeStmt &stmt) {
 
 } // namespace
 
-std::string printAst(const Ast &ast) {
+std::string printAst(Ast const &ast, FuncDefs const &functions) {
     auto stream = std::stringstream{};
 
     stream << "(" << std::endl;
     for (const auto &stmt : ast) {
-        stream << "\t" << printStatement(stmt) << std::endl;
+        stream << "\t" << printStatement(stmt, functions) << std::endl;
     }
     stream << ")" << std::endl;
 

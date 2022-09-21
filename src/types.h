@@ -34,4 +34,4 @@ std::string printType(const type::Type &type);
 
 using TypeInfo = std::unordered_map<std::string_view, type::Type>;
 
-TypeInfo resolveTypes(const Ast &ast);
+TypeInfo resolveTypes(const ParserOutput &parserOutput);
