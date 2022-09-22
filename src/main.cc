@@ -21,7 +21,7 @@ void startCompilation(const std::filesystem::path &rootSourceFile, const std::fi
     (void)typeInfo;
 
     auto outputStream = std::ofstream(outputFile, std::ios::out);
-    outputStream << generateCode(parserOutput.ast);
+    outputStream << generateCode(parserOutput);
 }
 
 } // namespace

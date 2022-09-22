@@ -54,10 +54,15 @@ struct AstNodeStmt : public std::variant<AstNodeAssignment, AstNodeFuncCall> {
 
 using Ast = std::vector<AstNodeStmt>;
 
+struct TypedVariable {
+    TokenIdentifier varName;
+    TokenIdentifier varType;
+};
+
 struct FunctionDefinition {
-    std::vector<std::pair<TokenIdentifier, TokenIdentifier>> arguments;
-    std::vector<std::pair<TokenIdentifier, TokenIdentifier>> returnVals;
-    std::vector<AstNodeStmt> functionBody;
+    std::vector<TypedVariable> arguments;
+    std::vector<TypedVariable> returnVals;
+    Ast functionBody;
 };
 
 using FuncDefs = std::unordered_map<std::string, FunctionDefinition>;

@@ -2,6 +2,6 @@
 
 #include <string>
 
-#include "ast.h"
+#include "parser.h"
 
-std::string generateCode(const Ast &ast);
+std::string generateCode(const ParserOutput &parserOutput);

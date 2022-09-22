@@ -20,6 +20,7 @@ constexpr auto *STD_LIB_CONTENTS = R"STDLIB_RAWSTRING(
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <tuple>
 
 template<typename... Ts>
 void print(Ts&&... args) {
@@ -30,6 +31,72 @@ void print(Ts&&... args) {
 }
 
 )STDLIB_RAWSTRING";
+
+void writeStdLib(std::ostream &output) { output << STD_LIB_CONTENTS; }
+
+std::string typeNameToCppTypeName(TokenIdentifier typeName) {
+    const auto &name = typeName.name;
+
+    if (name == "int") {
+        return "int64_t";
+    }
+
+    if (name == "str") {
+        return "std::string";
+    }
+
+    return std::string{name};
+}
+
+std::string returnTypeToCppTypeName(std::vector<TypedVariable> const &returnTypes) {
+    auto typesNum = std::ssize(returnTypes);
+
+    if (typesNum == 0) {
+        return "void";
+    }
+
+    if (typesNum == 1) {
+        const auto &[argName, argType] = returnTypes.front();
+        return typeNameToCppTypeName(argType);
+    }
+
+    auto out = std::stringstream{};
+    out << "std::tuple<";
+    for (auto i = 0; i < typesNum; ++i) {
+        if (i > 0) {
+            out << ", ";
+        }
+        auto const &[argName, argType] = returnTypes.at(i);
+        out << typeNameToCppTypeName(argType);
+    }
+    out << ">";
+    return out.str();
+}
+
+void writeReturnStatement(std::ostream &output, std::vector<TypedVariable> const &returnVals) {
+    auto retValsNum = std::ssize(returnVals);
+
+    if (retValsNum == 0) {
+        output << "return;" << std::endl;
+        return;
+    }
+
+    if (retValsNum == 1) {
+        auto const &[varName, varType] = returnVals.front();
+        output << "return " << varName.name << ";" << std::endl;
+        return;
+    }
+
+    output << "return std::make_tuple(";
+    for (auto i = 0; i < retValsNum; ++i) {
+        if (i > 0) {
+            output << ", ";
+        }
+        auto const &[argName, argType] = returnVals.at(i);
+        output << argName.name;
+    }
+    output << ");" << std::endl;
+}
 
 std::string writeTemporaryAssignment(std::ostream &output, const AstNodeExpr &expr);
 
@@ -98,8 +165,7 @@ std::string writeTemporaryAssignment(std::ostream &output, const AstNodeExpr &ex
     }
 
     if (const auto funcDef = to<AstNodeFuncRef>(expr)) {
-        std::cerr << "Generating function definitions is not supported yet." << std::endl;
-        return writeDecl("nullptr");
+        return writeDecl(funcDef->generatedName);
     }
 
     std::cerr << "Unexpected expression type: " << expr.index() << std::endl;
@@ -117,10 +183,7 @@ void writeAssignment(std::ostream &output, const AstNodeAssignment &assignment) 
     output << "auto " << varName << " = " << tmpVar << ";\n";
 }
 
-void writeMain(std::ostream &output, const Ast &ast) {
-    output << "int main() {\n";
-    auto endMain = defer([&] { output << "}\n"; });
-
+void writeSingleFunctionBody(std::ostream &output, const Ast &ast) {
     for (const auto &stmt : ast) {
         if (const auto &assignment = to<AstNodeAssignment>(stmt)) {
             writeAssignment(output, *assignment);
@@ -133,11 +196,58 @@ void writeMain(std::ostream &output, const Ast &ast) {
     }
 }
 
+void writeFunctionHeader(std::ostream &output, const std::string &name, const FunctionDefinition &func) {
+    output << returnTypeToCppTypeName(func.returnVals) << " " << name << "(";
+    for (auto i = 0; i < ssize(func.arguments); ++i) {
+        if (i > 0) {
+            output << ", ";
+        }
+        auto const &[argName, argType] = func.arguments.at(i);
+        output << typeNameToCppTypeName(argType) << " " << argName.name;
+    }
+    output << ")";
+}
+
+void writeFunctionDeclaration(std::ostream &output, const std::string &name, const FunctionDefinition &func) {
+    writeFunctionHeader(output, name, func);
+    output << ";" << std::endl;
+}
+
+void writeFunctionDefinition(std::ostream &output, const std::string &name, const FunctionDefinition &func) {
+    writeFunctionHeader(output, name, func);
+    output << " {" << std::endl;
+    writeSingleFunctionBody(output, func.functionBody);
+    writeReturnStatement(output, func.returnVals);
+    output << "}" << std::endl;
+}
+
+void writeUserFunctions(std::ostream &output, const FuncDefs &funcDefs) {
+    (void)funcDefs;
+
+    auto declarations = std::stringstream{};
+    auto definitions = std::stringstream{};
+
+    for (const auto &[name, def] : funcDefs) {
+        writeFunctionDeclaration(declarations, name, def);
+        writeFunctionDefinition(definitions, name, def);
+    }
+
+    output << declarations.str() << std::endl;
+    output << definitions.str() << std::endl;
+}
+
+void writeMain(std::ostream &output, const Ast &ast) {
+    output << "int main() {\n";
+    writeSingleFunctionBody(output, ast);
+    output << "}\n";
+}
+
 } // namespace
 
-std::string generateCode(const Ast &ast) {
+std::string generateCode(const ParserOutput &parserOutput) {
     auto output = std::stringstream{};
-    output << STD_LIB_CONTENTS;
-    writeMain(output, ast);
+    writeStdLib(output);
+    writeUserFunctions(output, parserOutput.functions);
+    writeMain(output, parserOutput.ast);
     return output.str();
 }
