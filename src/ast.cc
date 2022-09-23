@@ -60,9 +60,7 @@ std::string printExpression(const AstNodeExpr &expr, const FuncDefs &functions) 
             out << " (RET_VAL " << retName.name << " TYPE " << retType.name << ")";
         }
         out << ") BEGIN\n";
-        for (const auto &fnStmt : funcDef.functionBody) {
-            out << printStatement(fnStmt, functions) << "\n";
-        }
+        out << printStatement(funcDef.functionBody, functions) << "\n";
         out << "END";
         return out.str();
     }
@@ -75,10 +73,22 @@ std::string printStatement(const AstNodeStmt &stmt, const FuncDefs &functions) {
     if (std::holds_alternative<AstNodeFuncCall>(stmt)) {
         auto funcCall = std::get<AstNodeFuncCall>(stmt);
         return printExpression(AstNodeExpr{funcCall}, functions);
-    } else if (std::holds_alternative<AstNodeAssignment>(stmt)) {
+    }
+
+    if (std::holds_alternative<AstNodeAssignment>(stmt)) {
         auto assignment = std::get<AstNodeAssignment>(stmt);
         return std::string{assignment.variable.name} +
                " := " + printExpression(AstNodeExpr{assignment.value}, functions);
+    }
+
+    if (const auto scope = to<AstNodeScope>(stmt)) {
+        auto out = std::stringstream{};
+        out << "{\n";
+        for (const auto &subStmt : scope->statements) {
+            out << printStatement(subStmt, functions) << "\n";
+        }
+        out << "}";
+        return out.str();
     }
 
     std::cerr << "Unexpected statement type! Index: " << stmt.index() << std::endl;
@@ -87,7 +97,7 @@ std::string printStatement(const AstNodeStmt &stmt, const FuncDefs &functions) {
 
 } // namespace
 
-std::string printAst(Ast const &ast, FuncDefs const &functions) {
+std::string printAst(StmtList const &ast, FuncDefs const &functions) {
     auto stream = std::stringstream{};
 
     stream << "(" << std::endl;

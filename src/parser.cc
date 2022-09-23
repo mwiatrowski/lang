@@ -127,38 +127,44 @@ std::optional<AstNodeFuncRef> consumeFunctionDefinition(ParserContext &ctx) {
         return {};
     }
 
+    auto funcBody = consumeStatement(ctx);
+    if (!funcBody) {
+        std::cerr << "Expected a statement." << std::endl;
+        return {};
+    }
+
+    auto funcDef = FunctionDefinition{
+        .arguments = std::move(*funcArgs), .returnVals = std::move(*funcRetVals), .functionBody = std::move(*funcBody)};
+    auto funcName = generateNewFunctionName(ctx);
+    ctx.functions[funcName] = std::move(funcDef);
+
+    return AstNodeFuncRef{.generatedName = funcName};
+}
+
+std::optional<AstNodeScope> consumeScopedStmtList(ParserContext &ctx) {
+    auto &tokens = ctx.tokens;
+
     if (!peek<TokenLCurBrace>(tokens)) {
-        std::cerr << "Expected a curly opening brace." << std::endl;
+        std::cerr << "Expected an opening curly brace." << std::endl;
         return {};
     }
     std::tie(std::ignore, tokens) = consume<TokenLCurBrace>(tokens);
 
-    auto funcBody = std::vector<AstNodeStmt>{};
-    do {
-        if (peek<TokenRCurBrace>(tokens)) {
-            std::tie(std::ignore, tokens) = consume<TokenRCurBrace>(tokens);
-
-            auto funcDef = FunctionDefinition{.arguments = std::move(*funcArgs),
-                                              .returnVals = std::move(*funcRetVals),
-                                              .functionBody = std::move(funcBody)};
-            auto funcName = generateNewFunctionName(ctx);
-            ctx.functions[funcName] = std::move(funcDef);
-
-            return AstNodeFuncRef{.generatedName = funcName};
-        }
-
+    auto stmts = std::vector<AstNodeStmt>{};
+    while (!peek<TokenRCurBrace>(tokens)) {
         auto stmt = consumeStatement(ctx);
         if (!stmt) {
-            std::cerr << "Expected a statement." << std::endl;
+            std::cerr << "Expected a statement or a closing curly brace." << std::endl;
             tokens = consumeUntil<TokenRCurBrace>(tokens);
             return {};
         }
+        stmts.push_back(std::move(*stmt));
+    }
 
-        funcBody.push_back(std::move(*stmt));
-    } while (!tokens.empty());
+    assert(peek<TokenRCurBrace>(tokens));
+    std::tie(std::ignore, tokens) = consume<TokenRCurBrace>(tokens);
 
-    std::cerr << "Expected more tokens!" << std::endl;
-    return {};
+    return AstNodeScope{.statements = std::move(stmts)};
 }
 
 std::optional<AstNodeFuncCall> consumeFunctionCall(ParserContext &ctx) {
@@ -347,7 +353,9 @@ std::optional<AstNodeStmt> consumeStatement(ParserContext &ctx) {
 
     if (peek<TokenIdentifier, TokenAssignment>(tokens)) {
         return consumeAssignment(ctx);
-    } else if (peek<TokenIdentifier, TokenLBrace>(tokens)) {
+    }
+
+    if (peek<TokenIdentifier, TokenLBrace>(tokens)) {
         auto funcCall = consumeFunctionCall(ctx);
         if (!funcCall) {
             return {};
@@ -355,20 +363,28 @@ std::optional<AstNodeStmt> consumeStatement(ParserContext &ctx) {
         return AstNodeStmt{*funcCall};
     }
 
+    if (peek<TokenLCurBrace>(tokens)) {
+        auto scope = consumeScopedStmtList(ctx);
+        if (!scope) {
+            return {};
+        }
+        return AstNodeStmt{std::move(*scope)};
+    }
+
     std::cerr << "Failed to parse a statement" << std::endl;
     return {};
 }
 
-Ast parseSourceFile(ParserContext &ctx) {
+StmtList consumeStmtList(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
-    auto ast = Ast{};
+    auto stmts = StmtList{};
 
     while (!tokens.empty()) {
         auto tokensSizeBeforeParse = tokens.size();
 
         auto stmt = consumeStatement(ctx);
         if (stmt.has_value()) {
-            ast.push_back(*stmt);
+            stmts.push_back(*stmt);
         }
 
         if (tokens.size() == tokensSizeBeforeParse) {
@@ -378,13 +394,13 @@ Ast parseSourceFile(ParserContext &ctx) {
         }
     }
 
-    return ast;
+    return stmts;
 }
 
 } // namespace
 
 ParserOutput parseSourceFile(TokensSpan tokens) {
     auto ctx = ParserContext{.tokens = tokens, .functions = {}};
-    auto ast = parseSourceFile(ctx);
+    auto ast = consumeStmtList(ctx);
     return ParserOutput{.ast = std::move(ast), .functions = std::move(ctx.functions)};
 }

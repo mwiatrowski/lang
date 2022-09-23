@@ -10,6 +10,8 @@
 struct AstNodeExpr;
 struct AstNodeStmt;
 
+using StmtList = std::vector<AstNodeStmt>;
+
 struct AstNodeIntLiteral {
     TokenIntLiteral value;
 };
@@ -48,11 +50,13 @@ struct AstNodeAssignment {
     AstNodeExpr value;
 };
 
-struct AstNodeStmt : public std::variant<AstNodeAssignment, AstNodeFuncCall> {
-    using std::variant<AstNodeAssignment, AstNodeFuncCall>::variant;
+struct AstNodeScope {
+    StmtList statements;
 };
 
-using Ast = std::vector<AstNodeStmt>;
+struct AstNodeStmt : public std::variant<AstNodeAssignment, AstNodeFuncCall, AstNodeScope> {
+    using std::variant<AstNodeAssignment, AstNodeFuncCall, AstNodeScope>::variant;
+};
 
 struct TypedVariable {
     TokenIdentifier varName;
@@ -62,9 +66,9 @@ struct TypedVariable {
 struct FunctionDefinition {
     std::vector<TypedVariable> arguments;
     std::vector<TypedVariable> returnVals;
-    Ast functionBody;
+    AstNodeStmt functionBody;
 };
 
 using FuncDefs = std::unordered_map<std::string, FunctionDefinition>;
 
-std::string printAst(Ast const &ast, FuncDefs const &functions);
+std::string printAst(StmtList const &ast, FuncDefs const &functions);

@@ -8,7 +8,7 @@
 using TokensSpan = std::span<const Token>;
 
 struct ParserOutput {
-    Ast ast;
+    StmtList ast;
     FuncDefs functions;
 };
 

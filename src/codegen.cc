@@ -3,6 +3,8 @@
 #include <cassert>
 #include <iostream>
 #include <sstream>
+#include <string>
+#include <unordered_set>
 
 #include "scope.h"
 #include "variant_helpers.h"
@@ -31,6 +33,8 @@ void print(Ts&&... args) {
 }
 
 )STDLIB_RAWSTRING";
+
+using DeclaredVars = std::unordered_set<std::string>;
 
 void writeStdLib(std::ostream &output) { output << STD_LIB_CONTENTS; }
 
@@ -71,6 +75,14 @@ std::string returnTypeToCppTypeName(std::vector<TypedVariable> const &returnType
     }
     out << ">";
     return out.str();
+}
+
+void writeRetValDeclaration(std::ostream &output, DeclaredVars &declared,
+                            std::vector<TypedVariable> const &returnVals) {
+    for (auto const &[retName, retType] : returnVals) {
+        output << "auto " << retName.name << " = " << typeNameToCppTypeName(retType) << "{};\n";
+        declared.insert(std::string{retName.name});
+    }
 }
 
 void writeReturnStatement(std::ostream &output, std::vector<TypedVariable> const &returnVals) {
@@ -177,22 +189,50 @@ void writeFunctionCall(std::ostream &output, const AstNodeFuncCall &funcCall) {
     output << "(void) " << funcCallStr << ";\n";
 }
 
-void writeAssignment(std::ostream &output, const AstNodeAssignment &assignment) {
-    const auto &varName = assignment.variable.name;
+void writeAssignment(std::ostream &output, DeclaredVars &declared, const AstNodeAssignment &assignment) {
+    const auto varName = std::string{assignment.variable.name};
     auto tmpVar = writeTemporaryAssignment(output, assignment.value);
-    output << "auto " << varName << " = " << tmpVar << ";\n";
+
+    if (!declared.contains(varName)) {
+        output << "auto ";
+        declared.insert(varName);
+    }
+    output << varName << " = " << tmpVar << ";\n";
 }
 
-void writeSingleFunctionBody(std::ostream &output, const Ast &ast) {
-    for (const auto &stmt : ast) {
-        if (const auto &assignment = to<AstNodeAssignment>(stmt)) {
-            writeAssignment(output, *assignment);
-        } else if (const auto &funcCall = to<AstNodeFuncCall>(stmt)) {
-            writeFunctionCall(output, *funcCall);
-        } else {
-            std::cerr << "Unexpected statement type (index: " << stmt.index() << ")" << std::endl;
-            assert(false);
-        }
+void writeStatementList(std::ostream &output, DeclaredVars &declared, const StmtList &stmts);
+
+void writeScope(std::ostream &output, DeclaredVars &declared, AstNodeScope const &scope) {
+    auto declaredBefore = declared;
+    output << "{\n";
+    writeStatementList(output, declared, scope.statements);
+    output << "}\n";
+    declared = std::move(declaredBefore);
+}
+
+void writeStatement(std::ostream &output, DeclaredVars &declared, const AstNodeStmt &stmt) {
+    if (const auto &assignment = to<AstNodeAssignment>(stmt)) {
+        writeAssignment(output, declared, *assignment);
+        return;
+    }
+
+    if (const auto &funcCall = to<AstNodeFuncCall>(stmt)) {
+        writeFunctionCall(output, *funcCall);
+        return;
+    }
+
+    if (auto const &scope = to<AstNodeScope>(stmt)) {
+        writeScope(output, declared, *scope);
+        return;
+    }
+
+    std::cerr << "Unexpected statement type (index: " << stmt.index() << ")" << std::endl;
+    assert(false);
+}
+
+void writeStatementList(std::ostream &output, DeclaredVars &declared, const StmtList &stmts) {
+    for (const auto &stmt : stmts) {
+        writeStatement(output, declared, stmt);
     }
 }
 
@@ -215,8 +255,11 @@ void writeFunctionDeclaration(std::ostream &output, const std::string &name, con
 
 void writeFunctionDefinition(std::ostream &output, const std::string &name, const FunctionDefinition &func) {
     writeFunctionHeader(output, name, func);
+
+    auto declared = DeclaredVars{};
     output << " {" << std::endl;
-    writeSingleFunctionBody(output, func.functionBody);
+    writeRetValDeclaration(output, declared, func.returnVals);
+    writeStatement(output, declared, func.functionBody);
     writeReturnStatement(output, func.returnVals);
     output << "}" << std::endl;
 }
@@ -236,9 +279,10 @@ void writeUserFunctions(std::ostream &output, const FuncDefs &funcDefs) {
     output << definitions.str() << std::endl;
 }
 
-void writeMain(std::ostream &output, const Ast &ast) {
+void writeMain(std::ostream &output, const StmtList &ast) {
+    auto declared = DeclaredVars{};
     output << "int main() {\n";
-    writeSingleFunctionBody(output, ast);
+    writeStatementList(output, declared, ast);
     output << "}\n";
 }
 
