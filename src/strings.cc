@@ -18,6 +18,11 @@ std::vector<std::string_view> splitStr(std::string_view input, char separator) {
     return result;
 }
 
+std::pair<std::string_view, std::string_view> cutStr(std::string_view input, size_t pos) {
+    auto lenFirst = std::min(pos, input.size());
+    return {input.substr(0, lenFirst), input.substr(lenFirst)};
+}
+
 std::string_view consumeWhitespace(std::string_view input) {
     auto prefixLen = size_t{0};
     while (prefixLen < input.size() && std::isspace(input.at(prefixLen))) {

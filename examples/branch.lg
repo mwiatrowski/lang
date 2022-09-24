@@ -1,0 +1,10 @@
+x:=3
+if (x < 4) {
+    x:=1
+    print(x)
+} elif (x > 4) {
+    x:=2
+    print(x)
+} else {
+    print(x)
+}

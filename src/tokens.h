@@ -31,9 +31,13 @@ struct TokenIntLiteral {
 
 struct TokenKwFn {};
 
+struct TokenKwIf {};
+struct TokenKwElif {};
+struct TokenKwElse {};
+
 using Token = std::variant<TokenLBrace, TokenRBrace, TokenLCurBrace, TokenRCurBrace, TokenComma, TokenColon,
                            TokenRArrow, TokenPlus, TokenMinus, TokenAssignment, TokenIdentifier, TokenStringLiteral,
-                           TokenIntLiteral, TokenKwFn>;
+                           TokenIntLiteral, TokenKwFn, TokenKwIf, TokenKwElif, TokenKwElse>;
 
 std::string printToken(const Token &token);
 std::string printTokens(const std::vector<Token> &tokens);

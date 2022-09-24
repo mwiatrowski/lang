@@ -35,6 +35,12 @@ std::string printToken(const Token &token) {
         return "(INT_LITERAL " + std::to_string(intLiteral.value) + ")";
     } else if (std::holds_alternative<TokenKwFn>(token)) {
         return "FN";
+    } else if (std::holds_alternative<TokenKwIf>(token)) {
+        return "IF";
+    } else if (std::holds_alternative<TokenKwElif>(token)) {
+        return "ELIF";
+    } else if (std::holds_alternative<TokenKwElse>(token)) {
+        return "ELSE";
     }
 
     std::cerr << "Unexpected token type! Index: " << token.index() << std::endl;

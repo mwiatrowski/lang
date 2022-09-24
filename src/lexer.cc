@@ -10,11 +10,6 @@
 
 namespace {
 
-std::pair<std::string_view, std::string_view> cut(std::string_view input, size_t pos) {
-    auto lenFirst = std::min(pos, input.size());
-    return {input.substr(0, lenFirst), input.substr(lenFirst)};
-}
-
 std::pair<std::optional<TokenStringLiteral>, std::string_view> consumeStringLiteral(std::string_view input) {
     assert(!input.empty());
     assert(input.at(0) == '"');
@@ -80,13 +75,25 @@ std::pair<std::optional<Token>, std::string_view> consumeIdentifierOrKeyword(std
     assert(len > 0);
 
     auto tokenVal = std::string_view{};
-    std::tie(tokenVal, input) = cut(input, len);
+    std::tie(tokenVal, input) = cutStr(input, len);
 
     if (tokenVal == "fn") {
         return {TokenKwFn{}, input};
-    } else {
-        return {TokenIdentifier{.name = tokenVal}, input};
     }
+
+    if (tokenVal == "if") {
+        return {TokenKwIf{}, input};
+    }
+
+    if (tokenVal == "elif") {
+        return {TokenKwElif{}, input};
+    }
+
+    if (tokenVal == "else") {
+        return {TokenKwElse{}, input};
+    }
+
+    return {TokenIdentifier{.name = tokenVal}, input};
 }
 
 std::pair<std::optional<Token>, std::string_view> consumeOneToken(std::string_view input) {
