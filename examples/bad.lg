@@ -1,4 +1,0 @@
-func name with whitespace("hello")
-commas(1, 22, 333, , 4444, 1234567898765432123456789)
-f("arg") some garbage after the call
-unfinished(1, 2, 4

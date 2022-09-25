@@ -1,8 +1,1 @@
 print("Hello, World!")
-multiple_arguments("first", "second", "third")
-print("One", 2, three, four(x, y, z))
-no_arguments_is_ok()
-pass_an_expression(1+2-4+6-1)
-print(2+2, "is", 4, -1, "that's 3")
-x := -10
-y := compute(1, 5, 7) + 23 - compute(2, 7)
