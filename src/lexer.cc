@@ -136,6 +136,30 @@ std::pair<std::optional<Token>, std::string_view> consumeOneToken(std::string_vi
         return {TokenMinus{}, input.substr(1)};
     }
 
+    if (input.starts_with("<=")) {
+        return {TokenLessOrEqual{}, input.substr(2)};
+    }
+
+    if (input.starts_with('<')) {
+        return {TokenLess{}, input.substr(1)};
+    }
+
+    if (input.starts_with(">=")) {
+        return {TokenGreaterOrEqual{}, input.substr(2)};
+    }
+
+    if (input.starts_with('>')) {
+        return {TokenGreater{}, input.substr(1)};
+    }
+
+    if (input.starts_with("=")) {
+        return {TokenEqual{}, input.substr(1)};
+    }
+
+    if (input.starts_with("!=")) {
+        return {TokenNotEqual{}, input.substr(2)};
+    }
+
     if (input.size() >= 2 && input.starts_with(":=")) {
         return {TokenAssignment{}, input.substr(2)};
     }

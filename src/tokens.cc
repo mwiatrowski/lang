@@ -22,6 +22,18 @@ std::string printToken(const Token &token) {
         return "PLUS";
     } else if (std::holds_alternative<TokenMinus>(token)) {
         return "MINUS";
+    } else if (std::holds_alternative<TokenLess>(token)) {
+        return "LESS";
+    } else if (std::holds_alternative<TokenLessOrEqual>(token)) {
+        return "LESS_OR_EQUAL";
+    } else if (std::holds_alternative<TokenGreater>(token)) {
+        return "GREATER";
+    } else if (std::holds_alternative<TokenGreaterOrEqual>(token)) {
+        return "GREATER_OR_EQUAL";
+    } else if (std::holds_alternative<TokenEqual>(token)) {
+        return "EQUAL";
+    } else if (std::holds_alternative<TokenNotEqual>(token)) {
+        return "NOT_EQUAL";
     } else if (std::holds_alternative<TokenAssignment>(token)) {
         return "ASSIGN";
     } else if (std::holds_alternative<TokenIdentifier>(token)) {

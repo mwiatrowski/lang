@@ -16,6 +16,14 @@ struct TokenRArrow {};
 
 struct TokenPlus {};
 struct TokenMinus {};
+
+struct TokenLess {};
+struct TokenLessOrEqual {};
+struct TokenGreater {};
+struct TokenGreaterOrEqual {};
+struct TokenEqual {};
+struct TokenNotEqual {};
+
 struct TokenAssignment {};
 
 struct TokenIdentifier {
@@ -36,8 +44,9 @@ struct TokenKwElif {};
 struct TokenKwElse {};
 
 using Token = std::variant<TokenLBrace, TokenRBrace, TokenLCurBrace, TokenRCurBrace, TokenComma, TokenColon,
-                           TokenRArrow, TokenPlus, TokenMinus, TokenAssignment, TokenIdentifier, TokenStringLiteral,
-                           TokenIntLiteral, TokenKwFn, TokenKwIf, TokenKwElif, TokenKwElse>;
+                           TokenRArrow, TokenPlus, TokenMinus, TokenLess, TokenLessOrEqual, TokenGreater,
+                           TokenGreaterOrEqual, TokenEqual, TokenNotEqual, TokenAssignment, TokenIdentifier,
+                           TokenStringLiteral, TokenIntLiteral, TokenKwFn, TokenKwIf, TokenKwElif, TokenKwElse>;
 
 std::string printToken(const Token &token);
 std::string printTokens(const std::vector<Token> &tokens);
