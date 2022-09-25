@@ -50,6 +50,24 @@ using TypedArgList = decltype(FunctionDefinition::arguments);
 std::optional<AstNodeExpr> consumeExpression(ParserContext &ctx);
 std::optional<AstNodeStmt> consumeStatement(ParserContext &ctx);
 
+template <typename TokenType> std::optional<TokenType> consumeToken(ParserContext &ctx) {
+    auto &tokens = ctx.tokens;
+
+    if (!peek<TokenType>(tokens)) {
+        return {};
+    }
+
+    auto [head, tail] = consume<TokenType>(tokens);
+    tokens = tail;
+    return head;
+}
+
+template <typename... TokenType> std::optional<Token> consumeTokenAnyOf(ParserContext &ctx) {
+    auto result = std::optional<Token>{};
+    ((result = consumeToken<TokenType>(ctx)) || ...);
+    return result;
+}
+
 std::optional<TypedArgList> consumeTypedArgList(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
 
@@ -269,6 +287,11 @@ std::optional<AstNodeExpr> consumeBasicExpression(ParserContext &ctx) {
     return {};
 }
 
+std::optional<Token> consumeBinaryOperator(ParserContext &ctx) {
+    return consumeTokenAnyOf<TokenPlus, TokenMinus, TokenLess, TokenLessOrEqual, TokenGreater, TokenGreaterOrEqual,
+                             TokenEqual, TokenNotEqual>(ctx);
+}
+
 std::optional<AstNodeExpr> consumeExpression(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
 
@@ -282,15 +305,12 @@ std::optional<AstNodeExpr> consumeExpression(ParserContext &ctx) {
     auto operators = std::vector<Token>{};
 
     while (!tokens.empty()) {
-        if (peek<TokenPlus>(tokens)) {
-            std::tie(std::ignore, tokens) = consume<TokenPlus>(tokens);
-            operators.push_back(TokenPlus{});
-        } else if (peek<TokenMinus>(tokens)) {
-            std::tie(std::ignore, tokens) = consume<TokenMinus>(tokens);
-            operators.push_back(TokenMinus{});
-        } else {
+        auto op = consumeBinaryOperator(ctx);
+        if (!op) {
             break;
         }
+
+        operators.push_back(*op);
 
         auto nextBasicExpr = consumeBasicExpression(ctx);
         if (!nextBasicExpr) {
@@ -304,24 +324,15 @@ std::optional<AstNodeExpr> consumeExpression(ParserContext &ctx) {
     assert(!subExprs.empty());
     assert(subExprs.size() == operators.size() + 1);
 
-    // Addition and substraction have the same priority, so the resulting tree has
-    // a trivial structure.
+    // For now, assume that all operators have the same precedence.
+    // This will change in the future.
     auto lhs = std::move(subExprs.front());
     for (auto i = size_t{}; i < operators.size(); ++i) {
         auto rhs = std::move(subExprs.at(i + 1));
         auto op = operators.at(i);
 
-        auto operands = std::vector<AstNodeExpr>{std::move(lhs), std::move(rhs)};
-        if (std::holds_alternative<TokenPlus>(op)) {
-            auto newLhs = AstNodeAddition{.operands = std::move(operands)};
-            lhs = AstNodeExpr{std::move(newLhs)};
-        } else if (std::holds_alternative<TokenMinus>(op)) {
-            auto newLhs = AstNodeSubstraction{.operands = std::move(operands)};
-            lhs = AstNodeExpr{std::move(newLhs)};
-        } else {
-            std::cerr << "Expected a binary operation, got " << printToken(op) << std::endl;
-            assert(false);
-        }
+        auto newLhs = AstNodeBinaryOp{.op = op, .operands = {std::move(lhs), std::move(rhs)}};
+        lhs = AstNodeExpr{std::move(newLhs)};
     }
     return lhs;
 }

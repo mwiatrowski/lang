@@ -26,11 +26,8 @@ struct AstNodeFuncCall {
     std::vector<AstNodeExpr> arguments;
 };
 
-struct AstNodeAddition {
-    std::vector<AstNodeExpr> operands; // size 2
-};
-
-struct AstNodeSubstraction {
+struct AstNodeBinaryOp {
+    Token op;
     std::vector<AstNodeExpr> operands; // size 2
 };
 
@@ -43,7 +40,7 @@ struct AstNodeFuncRef {
 };
 
 struct AstNodeExpr : public std::variant<AstNodeIntLiteral, AstNodeStringLiteral, AstNodeIdentifier, AstNodeFuncCall,
-                                         AstNodeAddition, AstNodeSubstraction, AstNodeNegation, AstNodeFuncRef> {};
+                                         AstNodeBinaryOp, AstNodeNegation, AstNodeFuncRef> {};
 
 struct AstNodeAssignment {
     TokenIdentifier variable;

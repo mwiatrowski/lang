@@ -30,16 +30,12 @@ std::string printExpression(const AstNodeExpr &expr, const FuncDefs &functions) 
         }
         stream << ")";
         return stream.str();
-    } else if (std::holds_alternative<AstNodeAddition>(expr)) {
-        auto addition = std::get<AstNodeAddition>(expr);
-        const auto &operands = addition.operands;
-        assert(operands.size() == 2);
-        return "(" + printExpression(operands[0], functions) + " + " + printExpression(operands[1], functions) + ")";
-    } else if (std::holds_alternative<AstNodeSubstraction>(expr)) {
-        auto substraction = std::get<AstNodeSubstraction>(expr);
-        const auto &operands = substraction.operands;
-        assert(operands.size() == 2);
-        return "(" + printExpression(operands[0], functions) + " - " + printExpression(operands[1], functions) + ")";
+    } else if (auto binaryOp = to<AstNodeBinaryOp>(expr)) {
+        assert(binaryOp->operands.size() == 2);
+        auto const &lhs = binaryOp->operands[0];
+        auto const &rhs = binaryOp->operands[1];
+        return "(" + printExpression(lhs, functions) + " " + printToken(binaryOp->op) + " " +
+               printExpression(rhs, functions) + ")";
     } else if (std::holds_alternative<AstNodeNegation>(expr)) {
         auto negation = std::get<AstNodeNegation>(expr);
         const auto &operands = negation.operands;

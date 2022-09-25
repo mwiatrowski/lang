@@ -2,5 +2,6 @@ x := 10
 y := x - 7
 z := -1 + x + y
 s := "What's up?"
+b := x >= y
 
-print(x + y, z, s)
+print(x + y, z, s, b)

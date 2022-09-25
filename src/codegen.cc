@@ -131,6 +131,36 @@ std::string generateFuncCallStr(std::ostream &output, const AstNodeFuncCall &fun
     return funcCallStr.str();
 }
 
+char const *getBinaryOperationStr(Token const &op) {
+    if (to<TokenPlus>(op)) {
+        return "+";
+    }
+    if (to<TokenMinus>(op)) {
+        return "-";
+    }
+    if (to<TokenLess>(op)) {
+        return "<";
+    }
+    if (to<TokenLessOrEqual>(op)) {
+        return "<=";
+    }
+    if (to<TokenGreater>(op)) {
+        return ">";
+    }
+    if (to<TokenGreaterOrEqual>(op)) {
+        return ">=";
+    }
+    if (to<TokenEqual>(op)) {
+        return "==";
+    }
+    if (to<TokenNotEqual>(op)) {
+        return "!=";
+    }
+
+    std::cerr << "Expected a binary operator, got " << printToken(op) << std::endl;
+    assert(false);
+}
+
 std::string writeTemporaryAssignment(std::ostream &output, const AstNodeExpr &expr) {
     auto writeDecl = [&output](const auto &value) -> std::string {
         auto name = getTmpVarName();
@@ -156,18 +186,12 @@ std::string writeTemporaryAssignment(std::ostream &output, const AstNodeExpr &ex
         return writeDecl(funcCallStr);
     }
 
-    if (const auto addition = to<AstNodeAddition>(expr)) {
-        assert(addition->operands.size() == 2);
-        auto lhs = writeTemporaryAssignment(output, addition->operands[0]);
-        auto rhs = writeTemporaryAssignment(output, addition->operands[1]);
-        return writeDecl(lhs + " + " + rhs);
-    }
-
-    if (const auto substraction = to<AstNodeSubstraction>(expr)) {
-        assert(substraction->operands.size() == 2);
-        auto lhs = writeTemporaryAssignment(output, substraction->operands[0]);
-        auto rhs = writeTemporaryAssignment(output, substraction->operands[1]);
-        return writeDecl(lhs + " - " + rhs);
+    if (auto const binaryOp = to<AstNodeBinaryOp>(expr)) {
+        assert(binaryOp->operands.size() == 2);
+        auto lhs = writeTemporaryAssignment(output, binaryOp->operands[0]);
+        auto rhs = writeTemporaryAssignment(output, binaryOp->operands[1]);
+        auto const *op = getBinaryOperationStr(binaryOp->op);
+        return writeDecl(lhs + " " + op + " " + rhs);
     }
 
     if (const auto negation = to<AstNodeNegation>(expr)) {

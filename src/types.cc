@@ -48,34 +48,17 @@ std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, const TypeI
         return {};
     }
 
-    if (std::holds_alternative<AstNodeAddition>(expr)) {
-        const auto &addition = std::get<AstNodeAddition>(expr);
-        const auto lhsType = getExpressionType(addition.operands[0], typeInfo, funcDefs);
-        const auto rhsType = getExpressionType(addition.operands[1], typeInfo, funcDefs);
+    if (auto const binaryOp = to<AstNodeBinaryOp>(expr)) {
+        const auto lhsType = getExpressionType(binaryOp->operands[0], typeInfo, funcDefs);
+        const auto rhsType = getExpressionType(binaryOp->operands[1], typeInfo, funcDefs);
         if (!lhsType || !rhsType) {
             std::cerr << "Couldn't determine the type of one of the operands." << std::endl;
             return {};
         }
-        if (*lhsType != *rhsType) {
-            std::cerr << "Types of operands in addition don't match!" << std::endl;
-            return {};
-        }
-        return type::Type{std::move(*lhsType)};
-    }
 
-    if (std::holds_alternative<AstNodeSubstraction>(expr)) {
-        const auto &substraction = std::get<AstNodeSubstraction>(expr);
-        const auto lhsType = getExpressionType(substraction.operands[0], typeInfo, funcDefs);
-        const auto rhsType = getExpressionType(substraction.operands[1], typeInfo, funcDefs);
-        if (!lhsType || !rhsType) {
-            std::cerr << "Couldn't determine the type of one of the operands." << std::endl;
-            return {};
-        }
-        if (!std::holds_alternative<type::I64>(*lhsType) || !std::holds_alternative<type::I64>(*rhsType)) {
-            std::cerr << "Types of operands are not integers!" << std::endl;
-            return {};
-        }
-        return type::I64{};
+        // TODO: Implement this after boolean types.
+        std::cerr << "Can't determine the type of a binary operation." << std::endl;
+        return {};
     }
 
     if (std::holds_alternative<AstNodeNegation>(expr)) {
