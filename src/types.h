@@ -13,6 +13,10 @@ struct I64 {
     auto operator<=>(const I64 &) const = default;
 };
 
+struct Bool {
+    auto operator<=>(const Bool &) const = default;
+};
+
 struct String {
     auto operator<=>(const String &) const = default;
 };
@@ -24,8 +28,8 @@ struct Function {
     auto operator<=>(const Function &) const = default;
 };
 
-struct Type : public std::variant<I64, String, Function> {
-    using std::variant<I64, String, Function>::variant;
+struct Type : public std::variant<I64, Bool, String, Function> {
+    using std::variant<I64, Bool, String, Function>::variant;
 };
 
 } // namespace type

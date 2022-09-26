@@ -9,3 +9,7 @@ template <typename T, typename... As> std::optional<T> to(const std::variant<As.
     }
     return {};
 }
+
+template <typename... SubTypes, typename... Types> bool anyOf(std::variant<Types...> const &taggedUnion) {
+    return (false || ... || std::holds_alternative<SubTypes>(taggedUnion));
+}

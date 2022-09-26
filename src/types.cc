@@ -22,6 +22,40 @@ std::optional<type::Type> getTypeFromName(std::string_view name) {
     return {};
 }
 
+std::optional<type::Type> getBinaryOperationType(Token const &op, type::Type const &lhsType,
+                                                 type::Type const &rhsType) {
+    if (lhsType != rhsType) {
+        std::cerr << "Binary operation operands have different types, " << printType(lhsType) << " vs "
+                  << printType(rhsType) << std::endl;
+        return {};
+    }
+
+    auto isComparison = [](Token const &op) {
+        return anyOf<TokenLess, TokenLessOrEqual, TokenGreater, TokenGreaterOrEqual, TokenEqual, TokenNotEqual>(op);
+    };
+
+    if (std::holds_alternative<type::I64>(lhsType)) {
+        if (anyOf<TokenPlus, TokenMinus>(op)) {
+            return type::I64{};
+        }
+        if (isComparison(op)) {
+            return type::Bool{};
+        }
+    } else if (std::holds_alternative<type::Bool>(lhsType)) {
+        if (anyOf<TokenEqual, TokenNotEqual>(op)) {
+            return type::Bool{};
+        }
+    } else if (std::holds_alternative<type::String>(lhsType)) {
+        if (anyOf<TokenPlus>(op)) {
+            return type::String{};
+        }
+    }
+
+    std::cerr << "Unexpected operation " << printToken(op) << " for operands of type " << printType(lhsType)
+              << std::endl;
+    return {};
+}
+
 std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, const TypeInfo &typeInfo,
                                             const FuncDefs &funcDefs) {
     if (std::holds_alternative<AstNodeIntLiteral>(expr)) {
@@ -56,9 +90,7 @@ std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, const TypeI
             return {};
         }
 
-        // TODO: Implement this after boolean types.
-        std::cerr << "Can't determine the type of a binary operation." << std::endl;
-        return {};
+        return getBinaryOperationType(binaryOp->op, *lhsType, *rhsType);
     }
 
     if (std::holds_alternative<AstNodeNegation>(expr)) {
@@ -108,6 +140,8 @@ std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, const TypeI
 std::string printType(const type::Type &type) {
     if (std::holds_alternative<type::I64>(type)) {
         return "i64";
+    } else if (std::holds_alternative<type::Bool>(type)) {
+        return "bool";
     } else if (std::holds_alternative<type::String>(type)) {
         return "string";
     } else if (const auto &func = to<type::Function>(type)) {
