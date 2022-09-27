@@ -1,6 +1,7 @@
 #include "parser.h"
 
 #include <cassert>
+#include <concepts>
 #include <iostream>
 #include <optional>
 #include <tuple>
@@ -66,6 +67,26 @@ template <typename... TokenType> std::optional<Token> consumeTokenAnyOf(ParserCo
     auto result = std::optional<Token>{};
     ((result = consumeToken<TokenType>(ctx)) || ...);
     return result;
+}
+
+std::optional<AstNodeExpr> consumeParenthesizedExpression(ParserContext &ctx) {
+    if (!consumeToken<TokenLBrace>(ctx)) {
+        std::cerr << "Expected an opening brace." << std::endl;
+        return {};
+    }
+
+    auto expr = consumeExpression(ctx);
+    if (!expr) {
+        std::cerr << "Expected an expression." << std::endl;
+        return {};
+    }
+
+    if (!consumeToken<TokenRBrace>(ctx)) {
+        std::cerr << "Expected a closing brace." << std::endl;
+        return {};
+    }
+
+    return expr;
 }
 
 std::optional<TypedArgList> consumeTypedArgList(ParserContext &ctx) {
@@ -243,6 +264,10 @@ std::optional<AstNodeFuncCall> consumeFunctionCall(ParserContext &ctx) {
 std::optional<AstNodeExpr> consumeBasicExpression(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
 
+    if (peek<TokenLBrace>(tokens)) {
+        return consumeParenthesizedExpression(ctx);
+    }
+
     if (peek<TokenIdentifier, TokenLBrace>(tokens)) {
         auto funcCall = consumeFunctionCall(ctx);
         return funcCall.has_value() ? std::optional<AstNodeExpr>{*funcCall} : std::optional<AstNodeExpr>{};
@@ -359,6 +384,80 @@ std::optional<AstNodeStmt> consumeAssignment(ParserContext &ctx) {
     return AstNodeAssignment{.variable = std::move(*variable), .value = std::move(*expr)};
 }
 
+template <typename InitialKeyword>
+requires(std::same_as<InitialKeyword, TokenKwIf> ||
+         std::same_as<InitialKeyword, TokenKwElif>) std::optional<Branch> consumeIfElifBranch(ParserContext &ctx) {
+    auto kw = consumeToken<InitialKeyword>(ctx);
+    if (!kw) {
+        std::cerr << "Expected " << printToken(InitialKeyword{}) << std::endl;
+        return {};
+    }
+
+    auto condition = consumeExpression(ctx);
+    if (!condition) {
+        std::cerr << "Expected an branch condition." << std::endl;
+        return {};
+    }
+
+    auto body = consumeStatement(ctx);
+    if (!body) {
+        std::cerr << "Expected a branch body." << std::endl;
+        return {};
+    }
+
+    return Branch{std::move(*condition), std::move(*body)};
+}
+
+std::optional<AstNodeStmt> consumeElseBranch(ParserContext &ctx) {
+    auto kw = consumeToken<TokenKwElse>(ctx);
+    if (!kw) {
+        std::cerr << "Expected " << printToken(TokenKwElse{}) << std::endl;
+        return {};
+    }
+
+    auto body = consumeStatement(ctx);
+    if (!body) {
+        std::cerr << "Expected a branch body." << std::endl;
+        return {};
+    }
+
+    return body;
+}
+
+std::optional<AstNodeIfBlock> consumeIfElifElse(ParserContext &ctx) {
+    auto &tokens = ctx.tokens;
+
+    auto brIfElif = std::vector<Branch>{};
+    auto brElse = std::vector<AstNodeStmt>{};
+
+    auto ifBranch = consumeIfElifBranch<TokenKwIf>(ctx);
+    if (!ifBranch) {
+        std::cerr << "Expected an 'if' branch." << std::endl;
+        return {};
+    }
+    brIfElif.push_back(std::move(*ifBranch));
+
+    while (peek<TokenKwElif>(tokens)) {
+        auto elifBranch = consumeIfElifBranch<TokenKwElif>(ctx);
+        if (!elifBranch) {
+            std::cerr << "Expected an 'elif' branch." << std::endl;
+            return {};
+        }
+        brIfElif.push_back(std::move(*elifBranch));
+    }
+
+    if (peek<TokenKwElse>(tokens)) {
+        auto elseBranch = consumeElseBranch(ctx);
+        if (!elseBranch) {
+            std::cerr << "Expected an 'else' branch." << std::endl;
+            return {};
+        }
+        brElse.push_back(std::move(*elseBranch));
+    }
+
+    return AstNodeIfBlock{.brIfElif = std::move(brIfElif), .brElse = std::move(brElse)};
+}
+
 std::optional<AstNodeStmt> consumeStatement(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
 
@@ -380,6 +479,10 @@ std::optional<AstNodeStmt> consumeStatement(ParserContext &ctx) {
             return {};
         }
         return AstNodeStmt{std::move(*scope)};
+    }
+
+    if (peek<TokenKwIf>(tokens)) {
+        return consumeIfElifElse(ctx);
     }
 
     std::cerr << "Failed to parse a statement" << std::endl;

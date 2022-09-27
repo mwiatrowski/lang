@@ -250,6 +250,11 @@ void writeStatement(std::ostream &output, DeclaredVars &declared, const AstNodeS
         return;
     }
 
+    if (is<AstNodeIfBlock>(stmt)) {
+        std::cerr << "Code generation for if-elif-else blocks is not supported yet." << std::endl;
+        return;
+    }
+
     std::cerr << "Unexpected statement type (index: " << stmt.index() << ")" << std::endl;
     assert(false);
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <variant>
@@ -51,8 +52,19 @@ struct AstNodeScope {
     StmtList statements;
 };
 
-struct AstNodeStmt : public std::variant<AstNodeAssignment, AstNodeFuncCall, AstNodeScope> {
-    using std::variant<AstNodeAssignment, AstNodeFuncCall, AstNodeScope>::variant;
+struct Branch;
+struct AstNodeIfBlock {
+    std::vector<Branch> brIfElif;
+    std::vector<AstNodeStmt> brElse; // size 0 or 1
+};
+
+struct AstNodeStmt : public std::variant<AstNodeAssignment, AstNodeFuncCall, AstNodeScope, AstNodeIfBlock> {
+    using std::variant<AstNodeAssignment, AstNodeFuncCall, AstNodeScope, AstNodeIfBlock>::variant;
+};
+
+struct Branch {
+    AstNodeExpr condition;
+    AstNodeStmt body;
 };
 
 struct TypedVariable {

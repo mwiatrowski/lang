@@ -87,6 +87,28 @@ std::string printStatement(const AstNodeStmt &stmt, const FuncDefs &functions) {
         return out.str();
     }
 
+    if (is<AstNodeIfBlock>(stmt)) {
+        auto const &ifBlock = as<AstNodeIfBlock>(stmt);
+        assert(ifBlock.brIfElif.size() >= 1);
+
+        auto out = std::stringstream{};
+
+        bool isFirst = true;
+        for (auto const &branch : ifBlock.brIfElif) {
+            out << (isFirst ? "IF" : "ELIF") << " (" << printExpression(branch.condition, functions) << ") {\n"
+                << printStatement(branch.body, functions) << "\n}\n";
+            isFirst = false;
+        }
+
+        if (!ifBlock.brElse.empty()) {
+            assert(ifBlock.brElse.size() == 1);
+            auto const &elseBody = ifBlock.brElse.front();
+            out << "ELSE {\n" << printStatement(elseBody, functions) << "\n}\n";
+        }
+
+        return out.str();
+    }
+
     std::cerr << "Unexpected statement type! Index: " << stmt.index() << std::endl;
     assert(false);
 }
@@ -98,7 +120,7 @@ std::string printAst(StmtList const &ast, FuncDefs const &functions) {
 
     stream << "(" << std::endl;
     for (const auto &stmt : ast) {
-        stream << "\t" << printStatement(stmt, functions) << std::endl;
+        stream << printStatement(stmt, functions) << std::endl;
     }
     stream << ")" << std::endl;
 
