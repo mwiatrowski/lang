@@ -225,12 +225,40 @@ void writeAssignment(std::ostream &output, DeclaredVars &declared, const AstNode
 }
 
 void writeStatementList(std::ostream &output, DeclaredVars &declared, const StmtList &stmts);
+void writeStatement(std::ostream &output, DeclaredVars &declared, const AstNodeStmt &stmt);
 
 void writeScope(std::ostream &output, DeclaredVars &declared, AstNodeScope const &scope) {
     auto declaredBefore = declared;
     output << "{\n";
     writeStatementList(output, declared, scope.statements);
     output << "}\n";
+    declared = std::move(declaredBefore);
+}
+
+void writeIfElifElse(std::ostream &output, DeclaredVars &declared, AstNodeIfBlock const &ifElifElse) {
+    assert(ifElifElse.brIfElif.size() >= 1);
+    assert(ifElifElse.brElse.size() <= 1);
+
+    auto declaredBefore = declared;
+    auto nestingLevel = 0;
+
+    for (auto const &[condition, body] : ifElifElse.brIfElif) {
+        auto condVar = writeTemporaryAssignment(output, condition);
+        output << "if (" << condVar << ") {\n";
+        writeStatement(output, declared, body);
+        output << "} else {\n";
+        nestingLevel += 1;
+    }
+
+    if (ifElifElse.brElse.size() > 0) {
+        auto const &body = ifElifElse.brElse.front();
+        writeStatement(output, declared, body);
+    }
+
+    for (auto i = 0; i < nestingLevel; ++i) {
+        output << "}\n";
+    }
+
     declared = std::move(declaredBefore);
 }
 
@@ -251,7 +279,8 @@ void writeStatement(std::ostream &output, DeclaredVars &declared, const AstNodeS
     }
 
     if (is<AstNodeIfBlock>(stmt)) {
-        std::cerr << "Code generation for if-elif-else blocks is not supported yet." << std::endl;
+        auto const &ifElifElse = as<AstNodeIfBlock>(stmt);
+        writeIfElifElse(output, declared, ifElifElse);
         return;
     }
 
