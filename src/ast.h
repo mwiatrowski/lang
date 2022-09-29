@@ -58,8 +58,14 @@ struct AstNodeIfBlock {
     std::vector<AstNodeStmt> brElse; // size 0 or 1
 };
 
-struct AstNodeStmt : public std::variant<AstNodeAssignment, AstNodeFuncCall, AstNodeScope, AstNodeIfBlock> {
-    using std::variant<AstNodeAssignment, AstNodeFuncCall, AstNodeScope, AstNodeIfBlock>::variant;
+struct AstNodeWhileLoop {
+    AstNodeExpr condition;
+    std::vector<AstNodeStmt> body; // size 1
+};
+
+struct AstNodeStmt
+    : public std::variant<AstNodeAssignment, AstNodeFuncCall, AstNodeScope, AstNodeIfBlock, AstNodeWhileLoop> {
+    using std::variant<AstNodeAssignment, AstNodeFuncCall, AstNodeScope, AstNodeIfBlock, AstNodeWhileLoop>::variant;
 };
 
 struct Branch {

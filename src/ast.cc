@@ -109,6 +109,14 @@ std::string printStatement(const AstNodeStmt &stmt, const FuncDefs &functions) {
         return out.str();
     }
 
+    if (is<AstNodeWhileLoop>(stmt)) {
+        auto const &loop = as<AstNodeWhileLoop>(stmt);
+        assert(loop.body.size() == 1);
+
+        return "WHILE (" + printExpression(loop.condition, functions) + ") {\n" +
+               printStatement(loop.body.front(), functions) + "\n}";
+    }
+
     std::cerr << "Unexpected statement type! Index: " << stmt.index() << std::endl;
     assert(false);
 }

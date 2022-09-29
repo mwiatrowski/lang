@@ -262,6 +262,20 @@ void writeIfElifElse(std::ostream &output, DeclaredVars &declared, AstNodeIfBloc
     declared = std::move(declaredBefore);
 }
 
+void writeWhileLoop(std::ostream &output, DeclaredVars &declared, AstNodeWhileLoop const &loop) {
+    assert(loop.body.size() == 1);
+
+    auto declaredBefore = declared;
+
+    output << "while (true) {\n";
+    auto condVar = writeTemporaryAssignment(output, loop.condition);
+    output << "if (!" << condVar << ") { break; }\n";
+    writeStatement(output, declared, loop.body.front());
+    output << "}\n";
+
+    declared = std::move(declaredBefore);
+}
+
 void writeStatement(std::ostream &output, DeclaredVars &declared, const AstNodeStmt &stmt) {
     if (const auto &assignment = to<AstNodeAssignment>(stmt)) {
         writeAssignment(output, declared, *assignment);
@@ -281,6 +295,12 @@ void writeStatement(std::ostream &output, DeclaredVars &declared, const AstNodeS
     if (is<AstNodeIfBlock>(stmt)) {
         auto const &ifElifElse = as<AstNodeIfBlock>(stmt);
         writeIfElifElse(output, declared, ifElifElse);
+        return;
+    }
+
+    if (is<AstNodeWhileLoop>(stmt)) {
+        auto const &loop = as<AstNodeWhileLoop>(stmt);
+        writeWhileLoop(output, declared, loop);
         return;
     }
 

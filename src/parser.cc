@@ -458,6 +458,27 @@ std::optional<AstNodeIfBlock> consumeIfElifElse(ParserContext &ctx) {
     return AstNodeIfBlock{.brIfElif = std::move(brIfElif), .brElse = std::move(brElse)};
 }
 
+std::optional<AstNodeWhileLoop> consumeWhileLoop(ParserContext &ctx) {
+    if (!consumeToken<TokenKwWhile>(ctx)) {
+        std::cerr << "Expected the 'while' keyword" << std::endl;
+        return {};
+    }
+
+    auto condition = consumeExpression(ctx);
+    if (!condition) {
+        std::cerr << "Expected a loop condition." << std::endl;
+        return {};
+    }
+
+    auto body = consumeStatement(ctx);
+    if (!body) {
+        std::cerr << "Expected a loop body." << std::endl;
+        return {};
+    }
+
+    return AstNodeWhileLoop{.condition = std::move(*condition), .body = {std::move(*body)}};
+}
+
 std::optional<AstNodeStmt> consumeStatement(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
 
@@ -483,6 +504,10 @@ std::optional<AstNodeStmt> consumeStatement(ParserContext &ctx) {
 
     if (peek<TokenKwIf>(tokens)) {
         return consumeIfElifElse(ctx);
+    }
+
+    if (peek<TokenKwWhile>(tokens)) {
+        return consumeWhileLoop(ctx);
     }
 
     std::cerr << "Failed to parse a statement" << std::endl;

@@ -3,6 +3,8 @@
 #include <iostream>
 #include <sstream>
 
+#include "variant_helpers.h"
+
 std::string printToken(const Token &token) {
     if (std::holds_alternative<TokenLBrace>(token)) {
         return "L_BRACE";
@@ -53,6 +55,8 @@ std::string printToken(const Token &token) {
         return "ELIF";
     } else if (std::holds_alternative<TokenKwElse>(token)) {
         return "ELSE";
+    } else if (is<TokenKwWhile>(token)) {
+        return "WHILE";
     }
 
     std::cerr << "Unexpected token type! Index: " << token.index() << std::endl;

@@ -93,6 +93,10 @@ std::pair<std::optional<Token>, std::string_view> consumeIdentifierOrKeyword(std
         return {TokenKwElse{}, input};
     }
 
+    if (tokenVal == "while") {
+        return {TokenKwWhile{}, input};
+    }
+
     return {TokenIdentifier{.name = tokenVal}, input};
 }
 
