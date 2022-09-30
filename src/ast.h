@@ -63,10 +63,11 @@ struct AstNodeWhileLoop {
     std::vector<AstNodeStmt> body; // size 1
 };
 
-struct AstNodeStmt
-    : public std::variant<AstNodeAssignment, AstNodeFuncCall, AstNodeScope, AstNodeIfBlock, AstNodeWhileLoop> {
-    using std::variant<AstNodeAssignment, AstNodeFuncCall, AstNodeScope, AstNodeIfBlock, AstNodeWhileLoop>::variant;
-};
+struct AstNodeBreakStmt {};
+struct AstNodeContinueStmt {};
+
+struct AstNodeStmt : public std::variant<AstNodeAssignment, AstNodeFuncCall, AstNodeScope, AstNodeIfBlock,
+                                         AstNodeWhileLoop, AstNodeBreakStmt, AstNodeContinueStmt> {};
 
 struct Branch {
     AstNodeExpr condition;

@@ -304,6 +304,16 @@ void writeStatement(std::ostream &output, DeclaredVars &declared, const AstNodeS
         return;
     }
 
+    if (is<AstNodeBreakStmt>(stmt)) {
+        output << "break;\n";
+        return;
+    }
+
+    if (is<AstNodeContinueStmt>(stmt)) {
+        output << "continue;\n";
+        return;
+    }
+
     std::cerr << "Unexpected statement type (index: " << stmt.index() << ")" << std::endl;
     assert(false);
 }

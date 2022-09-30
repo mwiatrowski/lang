@@ -57,6 +57,10 @@ std::string printToken(const Token &token) {
         return "ELSE";
     } else if (is<TokenKwWhile>(token)) {
         return "WHILE";
+    } else if (is<TokenKwBreak>(token)) {
+        return "BREAK";
+    } else if (is<TokenKwContinue>(token)) {
+        return "CONTINUE";
     }
 
     std::cerr << "Unexpected token type! Index: " << token.index() << std::endl;

@@ -381,7 +381,7 @@ std::optional<AstNodeStmt> consumeAssignment(ParserContext &ctx) {
         return {};
     }
 
-    return AstNodeAssignment{.variable = std::move(*variable), .value = std::move(*expr)};
+    return AstNodeStmt{AstNodeAssignment{.variable = std::move(*variable), .value = std::move(*expr)}};
 }
 
 template <typename InitialKeyword>
@@ -503,11 +503,23 @@ std::optional<AstNodeStmt> consumeStatement(ParserContext &ctx) {
     }
 
     if (peek<TokenKwIf>(tokens)) {
-        return consumeIfElifElse(ctx);
+        auto ifElifElse = consumeIfElifElse(ctx);
+        return ifElifElse.has_value() ? AstNodeStmt{std::move(*ifElifElse)} : std::optional<AstNodeStmt>{};
     }
 
     if (peek<TokenKwWhile>(tokens)) {
-        return consumeWhileLoop(ctx);
+        auto loop = consumeWhileLoop(ctx);
+        return loop ? AstNodeStmt{std::move(*loop)} : std::optional<AstNodeStmt>{};
+    }
+
+    if (peek<TokenKwBreak>(tokens)) {
+        consumeToken<TokenKwBreak>(ctx);
+        return AstNodeStmt{AstNodeBreakStmt{}};
+    }
+
+    if (peek<TokenKwContinue>(tokens)) {
+        consumeToken<TokenKwContinue>(ctx);
+        return AstNodeStmt{AstNodeContinueStmt{}};
     }
 
     std::cerr << "Failed to parse a statement" << std::endl;

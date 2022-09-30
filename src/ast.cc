@@ -117,6 +117,14 @@ std::string printStatement(const AstNodeStmt &stmt, const FuncDefs &functions) {
                printStatement(loop.body.front(), functions) + "\n}";
     }
 
+    if (is<AstNodeBreakStmt>(stmt)) {
+        return "BREAK";
+    }
+
+    if (is<AstNodeContinueStmt>(stmt)) {
+        return "CONTINUE";
+    }
+
     std::cerr << "Unexpected statement type! Index: " << stmt.index() << std::endl;
     assert(false);
 }
