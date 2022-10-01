@@ -1,0 +1,14 @@
+fib := 0
+fib_next := 1
+i := 0
+
+println("Fibonacci numbers:")
+
+while i < 10 {
+    println("f", i, " = ", fib)
+
+    i := i + 1
+    tmp := fib
+    fib := fib + fib_next
+    fib_next := tmp
+}
