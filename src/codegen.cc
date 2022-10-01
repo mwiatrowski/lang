@@ -32,6 +32,12 @@ void print(Ts&&... args) {
   std::cout << output.str() << std::flush;
 }
 
+std::string input() {
+    auto result = std::string{};
+    std::cin >> result;
+    return result;
+}
+
 )STDLIB_RAWSTRING";
 
 using DeclaredVars = std::unordered_set<std::string>;

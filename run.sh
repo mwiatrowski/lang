@@ -21,5 +21,5 @@ for SOURCE in ../examples/*.lg; do
     echo -e "${CYAN}Running GCC on the transpiled output${NC}" &&
     g++ "${OUTPUT_PATH}" -o compiled.out &&
     echo -e "${CYAN}Running the compiled program${NC}" &&
-    ./compiled.out
+    ./compiled.out < ../examples/lorem_ipsum.txt
 done
