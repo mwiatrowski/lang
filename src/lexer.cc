@@ -108,13 +108,33 @@ std::pair<std::optional<Token>, std::string_view> consumeIdentifierOrKeyword(std
     return {TokenIdentifier{.name = tokenVal}, input};
 }
 
+std::string_view consumeWhitespaceAndComments(std::string_view input) {
+    while (!input.empty()) {
+        auto inputSizeBefore = input.size();
+
+        if (input.at(0) == '#') {
+            input = fastForwardTo(input, '\n');
+        }
+        input = consumeWhitespace(input);
+
+        if (input.size() == inputSizeBefore) {
+            break;
+        }
+    }
+
+    return input;
+}
+
 std::pair<std::optional<Token>, std::string_view> consumeOneToken(std::string_view input) {
-    input = consumeWhitespace(input);
+    input = consumeWhitespaceAndComments(input);
     if (input.empty()) {
         return {{}, input};
     }
 
     const char front = input.front();
+
+    if (front == '#') {
+    }
 
     if (front == '(') {
         return {TokenLBrace{}, input.substr(1)};

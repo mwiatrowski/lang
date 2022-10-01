@@ -30,6 +30,11 @@ std::optional<std::string_view> removePrefix(std::string_view input, std::string
     return {};
 }
 
+std::string_view fastForwardTo(std::string_view input, char c) {
+    auto cPos = input.find(c);
+    return (cPos == std::string::npos) ? std::string_view{} : input.substr(cPos);
+}
+
 std::string_view consumeWhitespace(std::string_view input) {
     auto prefixLen = size_t{0};
     while (prefixLen < input.size() && std::isspace(input.at(prefixLen))) {
