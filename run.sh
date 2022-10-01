@@ -10,15 +10,16 @@ cmake .. &&
 make &&
 
 for SOURCE in ../examples/*.lg; do
-    FULL_PATH=`realpath $SOURCE`
+    INPUT_PATH=`realpath $SOURCE`
     FILENAME=`basename $SOURCE`
+    OUTPUT_PATH="${FILENAME}.transpiled.cc"
 
-    echo -e "${L_GREEN}=== Example: $FULL_PATH ===${NC}"
+    echo -e "${L_GREEN}=== Example: $INPUT_PATH ===${NC}"
 
     echo -e "${CYAN}Running the compiler${NC}" &&
-    ./lang $FULL_PATH &&
+    ./lang --input=${INPUT_PATH} --output=${OUTPUT_PATH} "$@" &&
     echo -e "${CYAN}Running GCC on the transpiled output${NC}" &&
-    g++ "${FILENAME}.transpiled.cc" -o compiled.out &&
+    g++ "${OUTPUT_PATH}" -o compiled.out &&
     echo -e "${CYAN}Running the compiled program${NC}" &&
     ./compiled.out
 done

@@ -23,6 +23,13 @@ std::pair<std::string_view, std::string_view> cutStr(std::string_view input, siz
     return {input.substr(0, lenFirst), input.substr(lenFirst)};
 }
 
+std::optional<std::string_view> removePrefix(std::string_view input, std::string_view prefix) {
+    if (input.starts_with(prefix)) {
+        return input.substr(prefix.size());
+    }
+    return {};
+}
+
 std::string_view consumeWhitespace(std::string_view input) {
     auto prefixLen = size_t{0};
     while (prefixLen < input.size() && std::isspace(input.at(prefixLen))) {
