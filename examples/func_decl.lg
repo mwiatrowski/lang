@@ -8,7 +8,7 @@ bar := fn (a: str, b: str) -> (s: str) {
     s := a + b
 }
 barRes := bar("conca", "tenation")
-print(barRes)
+println(barRes)
 
 nop := fn () -> () {}
 nop()

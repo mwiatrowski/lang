@@ -1,5 +1,5 @@
 while true {
     word := input()
     if word = "" break
-    print(word)
+    println(word)
 }

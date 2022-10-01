@@ -9,4 +9,4 @@ if (x < 4) {
     y:=3
 }
 
-print(y)
+println(y)

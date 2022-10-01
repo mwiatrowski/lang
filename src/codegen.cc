@@ -26,10 +26,14 @@ constexpr auto *STD_LIB_CONTENTS = R"STDLIB_RAWSTRING(
 
 template<typename... Ts>
 void print(Ts&&... args) {
-  auto output = std::stringstream{};
-  ((output << std::forward<Ts>(args) << ' '), ...);
-  output << "\n";
-  std::cout << output.str() << std::flush;
+    auto output = std::stringstream{};
+    ((output << std::forward<Ts>(args)), ...);
+    std::cout << output.str() << std::flush;
+}
+
+template<typename... Ts>
+void println(Ts&&... args) {
+    print(std::forward<Ts>(args) ..., '\n');
 }
 
 std::string input() {

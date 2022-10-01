@@ -4,4 +4,4 @@ z := -1 + x + y
 s := "What's up?"
 b := x >= y
 
-print(x + y, z, s, b)
+println(x + y, " ", z, " ", s, " ", b)
