@@ -74,6 +74,11 @@ std::string printStatement(const AstNodeStmt &stmt, const FuncDefs &functions) {
         return printExpression(AstNodeExpr{funcCall}, functions);
     }
 
+    if (is<AstNodeDeclaration>(stmt)) {
+        auto const &decl = as<AstNodeDeclaration>(stmt);
+        return std::string{decl.variable.name} + " HAS TYPE " + std::string{decl.type.name};
+    }
+
     if (std::holds_alternative<AstNodeAssignment>(stmt)) {
         auto assignment = std::get<AstNodeAssignment>(stmt);
         return std::string{assignment.variable.name} +

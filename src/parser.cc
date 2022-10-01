@@ -368,6 +368,24 @@ std::optional<AstNodeExpr> consumeExpression(ParserContext &ctx) {
     return lhs;
 }
 
+std::optional<AstNodeStmt> consumeDeclaration(ParserContext &ctx) {
+    auto &tokens = ctx.tokens;
+
+    if (!peek<TokenIdentifier, TokenColon, TokenIdentifier>(tokens)) {
+        std::cerr << "Declaration must consist of a variable name, a colon and a type name." << std::endl;
+        return {};
+    }
+
+    auto variable = consumeToken<TokenIdentifier>(ctx);
+    assert(consumeToken<TokenColon>(ctx));
+    auto typeName = consumeToken<TokenIdentifier>(ctx);
+
+    assert(variable);
+    assert(typeName);
+
+    return AstNodeStmt{AstNodeDeclaration{.variable = std::move(*variable), .type = std::move(*typeName)}};
+}
+
 std::optional<AstNodeStmt> consumeAssignment(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
 
@@ -487,6 +505,10 @@ std::optional<AstNodeWhileLoop> consumeWhileLoop(ParserContext &ctx) {
 
 std::optional<AstNodeStmt> consumeStatement(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
+
+    if (peek<TokenIdentifier, TokenColon>(tokens)) {
+        return consumeDeclaration(ctx);
+    }
 
     if (peek<TokenIdentifier, TokenAssignment>(tokens)) {
         return consumeAssignment(ctx);

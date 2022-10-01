@@ -228,6 +228,17 @@ void writeFunctionCall(std::ostream &output, const AstNodeFuncCall &funcCall) {
     output << "(void) " << funcCallStr << ";\n";
 }
 
+void writeDeclaration(std::ostream &output, DeclaredVars &declared, AstNodeDeclaration const &decl) {
+    auto const varName = std::string{decl.variable.name};
+    if (declared.contains(varName)) {
+        std::cerr << "Cannot forward-declare an already declared variable." << std::endl;
+        return;
+    }
+
+    output << "auto " << varName << " = " << typeNameToCppTypeName(decl.type) << "{};\n";
+    declared.insert(varName);
+}
+
 void writeAssignment(std::ostream &output, DeclaredVars &declared, const AstNodeAssignment &assignment) {
     const auto varName = std::string{assignment.variable.name};
     auto tmpVar = writeTemporaryAssignment(output, assignment.value);
@@ -292,6 +303,12 @@ void writeWhileLoop(std::ostream &output, DeclaredVars &declared, AstNodeWhileLo
 }
 
 void writeStatement(std::ostream &output, DeclaredVars &declared, const AstNodeStmt &stmt) {
+    if (is<AstNodeDeclaration>(stmt)) {
+        auto const &decl = as<AstNodeDeclaration>(stmt);
+        writeDeclaration(output, declared, decl);
+        return;
+    }
+
     if (const auto &assignment = to<AstNodeAssignment>(stmt)) {
         writeAssignment(output, declared, *assignment);
         return;

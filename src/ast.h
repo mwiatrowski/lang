@@ -46,6 +46,11 @@ struct AstNodeFuncRef {
 struct AstNodeExpr : public std::variant<AstNodeIntLiteral, AstNodeStringLiteral, AstNodeBoolLiteral, AstNodeIdentifier,
                                          AstNodeFuncCall, AstNodeBinaryOp, AstNodeNegation, AstNodeFuncRef> {};
 
+struct AstNodeDeclaration {
+    TokenIdentifier variable;
+    TokenIdentifier type;
+};
+
 struct AstNodeAssignment {
     TokenIdentifier variable;
     AstNodeExpr value;
@@ -69,8 +74,8 @@ struct AstNodeWhileLoop {
 struct AstNodeBreakStmt {};
 struct AstNodeContinueStmt {};
 
-struct AstNodeStmt : public std::variant<AstNodeAssignment, AstNodeFuncCall, AstNodeScope, AstNodeIfBlock,
-                                         AstNodeWhileLoop, AstNodeBreakStmt, AstNodeContinueStmt> {};
+struct AstNodeStmt : public std::variant<AstNodeDeclaration, AstNodeAssignment, AstNodeFuncCall, AstNodeScope,
+                                         AstNodeIfBlock, AstNodeWhileLoop, AstNodeBreakStmt, AstNodeContinueStmt> {};
 
 struct Branch {
     AstNodeExpr condition;

@@ -1,0 +1,9 @@
+x : int
+
+if 5 > 9 {
+    x := 3
+} else {
+    x := 6
+}
+
+println("x = ", x, " (should be '6')")

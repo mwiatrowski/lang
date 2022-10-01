@@ -18,6 +18,10 @@ std::optional<type::Type> getTypeFromName(std::string_view name) {
         return type::String{};
     }
 
+    if (name == "bool") {
+        return type::Bool{};
+    }
+
     std::cerr << "Unknown type: " << name << std::endl;
     return {};
 }
@@ -170,7 +174,19 @@ TypeInfo resolveTypes(const ParserOutput &parserOutput) {
     auto types = TypeInfo{};
 
     for (const auto &stmt : parserOutput.ast) {
-        if (std::holds_alternative<AstNodeAssignment>(stmt)) {
+        if (is<AstNodeDeclaration>(stmt)) {
+            auto const &decl = as<AstNodeDeclaration>(stmt);
+            auto const &name = decl.variable.name;
+
+            auto type = getTypeFromName(decl.type.name);
+            if (!type) {
+                std::cerr << "Can't determine the type of " << name << std::endl;
+                continue;
+            }
+
+            types.insert_or_assign(name, *type);
+
+        } else if (std::holds_alternative<AstNodeAssignment>(stmt)) {
             auto assignment = std::get<AstNodeAssignment>(stmt);
             const auto &name = assignment.variable.name;
 
