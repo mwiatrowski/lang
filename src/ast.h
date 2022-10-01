@@ -19,6 +19,9 @@ struct AstNodeIntLiteral {
 struct AstNodeStringLiteral {
     TokenStringLiteral value;
 };
+struct AstNodeBoolLiteral {
+    TokenBoolLiteral value;
+};
 struct AstNodeIdentifier {
     TokenIdentifier value;
 };
@@ -40,8 +43,8 @@ struct AstNodeFuncRef {
     std::string generatedName;
 };
 
-struct AstNodeExpr : public std::variant<AstNodeIntLiteral, AstNodeStringLiteral, AstNodeIdentifier, AstNodeFuncCall,
-                                         AstNodeBinaryOp, AstNodeNegation, AstNodeFuncRef> {};
+struct AstNodeExpr : public std::variant<AstNodeIntLiteral, AstNodeStringLiteral, AstNodeBoolLiteral, AstNodeIdentifier,
+                                         AstNodeFuncCall, AstNodeBinaryOp, AstNodeNegation, AstNodeFuncRef> {};
 
 struct AstNodeAssignment {
     TokenIdentifier variable;

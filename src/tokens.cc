@@ -47,6 +47,9 @@ std::string printToken(const Token &token) {
     } else if (std::holds_alternative<TokenIntLiteral>(token)) {
         const auto &intLiteral = std::get<TokenIntLiteral>(token);
         return "(INT_LITERAL " + std::to_string(intLiteral.value) + ")";
+    } else if (is<TokenBoolLiteral>(token)) {
+        auto const &boolLiteral = as<TokenBoolLiteral>(token);
+        return "(BOOL_LITERAL " + std::string{boolLiteral.value ? "true" : "false"} + ")";
     } else if (std::holds_alternative<TokenKwFn>(token)) {
         return "FN";
     } else if (std::holds_alternative<TokenKwIf>(token)) {

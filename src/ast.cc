@@ -18,6 +18,9 @@ std::string printExpression(const AstNodeExpr &expr, const FuncDefs &functions) 
     } else if (std::holds_alternative<AstNodeStringLiteral>(expr)) {
         auto literal = std::get<AstNodeStringLiteral>(expr);
         return "(STRING_LITERAL " + std::string{literal.value.value} + ")";
+    } else if (is<AstNodeBoolLiteral>(expr)) {
+        auto const &literal = as<AstNodeBoolLiteral>(expr);
+        return "(BOOL_LITERAL " + std::string{literal.value.value ? "true" : "false"} + ")";
     } else if (std::holds_alternative<AstNodeIdentifier>(expr)) {
         auto identifier = std::get<AstNodeIdentifier>(expr);
         return "(IDENTIFIER " + std::string{identifier.value.name} + ")";

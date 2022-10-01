@@ -66,6 +66,10 @@ std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, const TypeI
         return type::String{};
     }
 
+    if (std::holds_alternative<AstNodeBoolLiteral>(expr)) {
+        return type::Bool{};
+    }
+
     if (std::holds_alternative<AstNodeIdentifier>(expr)) {
         const auto &identifier = std::get<AstNodeIdentifier>(expr);
         const auto &name = identifier.value.name;

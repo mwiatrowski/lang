@@ -291,6 +291,12 @@ std::optional<AstNodeExpr> consumeBasicExpression(ParserContext &ctx) {
         return AstNodeExpr{AstNodeStringLiteral{.value = tokenLiteral}};
     }
 
+    if (peek<TokenBoolLiteral>(tokens)) {
+        auto tokenLiteral = consumeToken<TokenBoolLiteral>(ctx);
+        assert(tokenLiteral.has_value());
+        return AstNodeExpr{AstNodeBoolLiteral{.value = *tokenLiteral}};
+    }
+
     if (peek<TokenMinus>(tokens)) {
         std::tie(std::ignore, tokens) = consume<TokenMinus>(tokens);
         auto expr = consumeExpression(ctx);

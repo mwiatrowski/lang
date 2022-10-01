@@ -183,6 +183,11 @@ std::string writeTemporaryAssignment(std::ostream &output, const AstNodeExpr &ex
         return writeDecl(escapedStr);
     }
 
+    if (is<AstNodeBoolLiteral>(expr)) {
+        auto const &literal = as<AstNodeBoolLiteral>(expr);
+        return writeDecl(literal.value.value ? "true" : "false");
+    }
+
     if (const auto identifier = to<AstNodeIdentifier>(expr)) {
         return writeDecl(identifier->value.name);
     }

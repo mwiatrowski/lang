@@ -105,6 +105,14 @@ std::pair<std::optional<Token>, std::string_view> consumeIdentifierOrKeyword(std
         return {TokenKwContinue{}, input};
     }
 
+    if (tokenVal == "true") {
+        return {TokenBoolLiteral{true}, input};
+    }
+
+    if (tokenVal == "false") {
+        return {TokenBoolLiteral{false}, input};
+    }
+
     return {TokenIdentifier{.name = tokenVal}, input};
 }
 
