@@ -10,6 +10,8 @@ add_compile_options(-Wall -Wextra -pedantic -Werror)
 
 add_compile_options(-fsanitize=address)
 add_link_options(-fsanitize=address)
+add_compile_options(-fsanitize=undefined)
+add_link_options(-fsanitize=undefined)
 
 set(COMPILER_EXECUTABLE "lang")
 add_executable(${COMPILER_EXECUTABLE}
