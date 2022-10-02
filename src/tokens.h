@@ -42,6 +42,8 @@ struct TokenBoolLiteral {
 
 struct TokenKwFn {};
 
+struct TokenKwStruct {};
+
 struct TokenKwIf {};
 struct TokenKwElif {};
 struct TokenKwElse {};
@@ -50,11 +52,11 @@ struct TokenKwWhile {};
 struct TokenKwBreak {};
 struct TokenKwContinue {};
 
-using Token =
-    std::variant<TokenLBrace, TokenRBrace, TokenLCurBrace, TokenRCurBrace, TokenComma, TokenColon, TokenRArrow,
-                 TokenPlus, TokenMinus, TokenLess, TokenLessOrEqual, TokenGreater, TokenGreaterOrEqual, TokenEqual,
-                 TokenNotEqual, TokenAssignment, TokenIdentifier, TokenStringLiteral, TokenIntLiteral, TokenBoolLiteral,
-                 TokenKwFn, TokenKwIf, TokenKwElif, TokenKwElse, TokenKwWhile, TokenKwBreak, TokenKwContinue>;
+using Token = std::variant<TokenLBrace, TokenRBrace, TokenLCurBrace, TokenRCurBrace, TokenComma, TokenColon,
+                           TokenRArrow, TokenPlus, TokenMinus, TokenLess, TokenLessOrEqual, TokenGreater,
+                           TokenGreaterOrEqual, TokenEqual, TokenNotEqual, TokenAssignment, TokenIdentifier,
+                           TokenStringLiteral, TokenIntLiteral, TokenBoolLiteral, TokenKwFn, TokenKwStruct, TokenKwIf,
+                           TokenKwElif, TokenKwElse, TokenKwWhile, TokenKwBreak, TokenKwContinue>;
 
 std::string printToken(const Token &token);
 std::string printTokens(const std::vector<Token> &tokens);

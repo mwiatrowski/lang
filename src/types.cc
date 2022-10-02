@@ -3,27 +3,67 @@
 #include <cassert>
 #include <iostream>
 #include <optional>
+#include <ranges>
 #include <sstream>
 
 #include "variant_helpers.h"
 
 namespace {
 
-std::optional<type::Type> getTypeFromName(std::string_view name) {
-    if (name == "int") {
-        return type::I64{};
-    }
+constexpr auto *BUILTIN_TYPE_INT = "int";
+constexpr auto *BUILTIN_TYPE_STR = "str";
+constexpr auto *BUILTIN_TYPE_BOOL = "bool";
 
-    if (name == "str") {
-        return type::String{};
-    }
+using TypeDefs = std::unordered_map<std::string, type::Type>;
 
-    if (name == "bool") {
-        return type::Bool{};
+std::optional<type::Type> getTypeFromName(std::string const &name, TypeDefs const &typeDefs) {
+    if (typeDefs.contains(name)) {
+        return typeDefs.at(name);
     }
 
     std::cerr << "Unknown type: " << name << std::endl;
     return {};
+}
+
+std::optional<type::Type> getTypeFromName(std::string_view name, TypeDefs const &typeDefs) {
+    auto nameStr = std::string{name};
+    return getTypeFromName(nameStr, typeDefs);
+}
+
+auto getInitialTypeDefs() -> TypeDefs {
+    return TypeDefs{{BUILTIN_TYPE_INT, type::Type{type::I64{}}},
+                    {BUILTIN_TYPE_STR, type::Type{type::String{}}},
+                    {BUILTIN_TYPE_BOOL, type::Type{type::Bool{}}}};
+}
+
+auto generateTypeDefs(StmtList const &statements) -> TypeDefs {
+    auto structs = std::span(statements.begin(), statements.end()) |
+                   std::views::filter([](auto const &stmt) { return is<AstNodeStructDecl>(stmt); }) |
+                   std::views::transform([](auto const &stmt) { return as<AstNodeStructDecl>(stmt); });
+
+    auto typeDefs = getInitialTypeDefs();
+
+    // TODO: This scheme doesn't handle out-of-order struct definitions.
+
+    for (auto const &[structNameIdent, structDef] : structs) {
+        auto mTypes = std::vector<type::Type>{};
+        mTypes.reserve(structDef.members.size());
+
+        for (auto const &member : structDef.members) {
+            if (auto type = getTypeFromName(member.varType.name, typeDefs)) {
+                mTypes.push_back(*type);
+            } else {
+                std::cerr << "Couldn't determine the type of a struct member." << std::endl;
+                return {};
+            }
+        }
+
+        auto structName = std::string{structNameIdent.name};
+        auto structType = type::Struct{.memberTypes = std::move(mTypes)};
+        typeDefs.insert_or_assign(structName, type::Type{std::move(structType)});
+    }
+
+    return typeDefs;
 }
 
 std::optional<type::Type> getBinaryOperationType(Token const &op, type::Type const &lhsType,
@@ -40,18 +80,18 @@ std::optional<type::Type> getBinaryOperationType(Token const &op, type::Type con
 
     if (std::holds_alternative<type::I64>(lhsType)) {
         if (anyOf<TokenPlus, TokenMinus>(op)) {
-            return type::I64{};
+            return type::Type{type::I64{}};
         }
         if (isComparison(op)) {
-            return type::Bool{};
+            return type::Type{type::Bool{}};
         }
     } else if (std::holds_alternative<type::Bool>(lhsType)) {
         if (anyOf<TokenEqual, TokenNotEqual>(op)) {
-            return type::Bool{};
+            return type::Type{type::Bool{}};
         }
     } else if (std::holds_alternative<type::String>(lhsType)) {
         if (anyOf<TokenPlus>(op)) {
-            return type::String{};
+            return type::Type{type::String{}};
         }
     }
 
@@ -60,28 +100,29 @@ std::optional<type::Type> getBinaryOperationType(Token const &op, type::Type con
     return {};
 }
 
-std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, const TypeInfo &typeInfo,
+std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, VarTypes const &varTypes, TypeDefs const &typeDefs,
                                             const FuncDefs &funcDefs) {
     if (std::holds_alternative<AstNodeIntLiteral>(expr)) {
-        return type::I64{};
+        return type::Type{type::I64{}};
     }
 
     if (std::holds_alternative<AstNodeStringLiteral>(expr)) {
-        return type::String{};
+        return type::Type{type::String{}};
     }
 
     if (std::holds_alternative<AstNodeBoolLiteral>(expr)) {
-        return type::Bool{};
+        return type::Type{type::Bool{}};
     }
 
     if (std::holds_alternative<AstNodeIdentifier>(expr)) {
         const auto &identifier = std::get<AstNodeIdentifier>(expr);
         const auto &name = identifier.value.name;
-        if (!typeInfo.contains(name)) {
+
+        if (!varTypes.contains(name)) {
             std::cerr << "Type of " << name << " cannot be determined." << std::endl;
             return {};
         }
-        return type::Type{typeInfo.at(name)};
+        return varTypes.at(name);
     }
 
     if (std::holds_alternative<AstNodeFuncCall>(expr)) {
@@ -91,8 +132,8 @@ std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, const TypeI
     }
 
     if (auto const binaryOp = to<AstNodeBinaryOp>(expr)) {
-        const auto lhsType = getExpressionType(binaryOp->operands[0], typeInfo, funcDefs);
-        const auto rhsType = getExpressionType(binaryOp->operands[1], typeInfo, funcDefs);
+        const auto lhsType = getExpressionType(binaryOp->operands[0], varTypes, typeDefs, funcDefs);
+        const auto rhsType = getExpressionType(binaryOp->operands[1], varTypes, typeDefs, funcDefs);
         if (!lhsType || !rhsType) {
             std::cerr << "Couldn't determine the type of one of the operands." << std::endl;
             return {};
@@ -103,12 +144,12 @@ std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, const TypeI
 
     if (std::holds_alternative<AstNodeNegation>(expr)) {
         const auto &negation = std::get<AstNodeNegation>(expr);
-        const auto type = getExpressionType(negation.operands[0], typeInfo, funcDefs);
+        const auto type = getExpressionType(negation.operands[0], varTypes, typeDefs, funcDefs);
         if (!type || !std::holds_alternative<type::I64>(*type)) {
             std::cerr << "Type of the expression is not integer." << std::endl;
             return {};
         }
-        return type::I64{};
+        return type::Type{type::I64{}};
     }
 
     if (const auto &fnRef = to<AstNodeFuncRef>(expr)) {
@@ -118,7 +159,7 @@ std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, const TypeI
 
         auto argTypes = std::vector<type::Type>{};
         for (const auto &[argName, argType] : fnDef.arguments) {
-            if (auto type = getTypeFromName(argType.name)) {
+            if (auto type = getTypeFromName(argType.name, typeDefs)) {
                 argTypes.push_back(*type);
             } else {
                 std::cerr << "Couldn't determine types of arguments." << std::endl;
@@ -128,7 +169,7 @@ std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, const TypeI
 
         auto retValTypes = std::vector<type::Type>{};
         for (const auto &[retValName, retValType] : fnDef.returnVals) {
-            if (auto type = getTypeFromName(retValType.name)) {
+            if (auto type = getTypeFromName(retValType.name, typeDefs)) {
                 retValTypes.push_back(*type);
             } else {
                 std::cerr << "Couldn't determine types of return values." << std::endl;
@@ -136,7 +177,7 @@ std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, const TypeI
             }
         }
 
-        return type::Function{.inputTypes = std::move(argTypes), .returnTypes = std::move(retValTypes)};
+        return type::Type{type::Function{.inputTypes = std::move(argTypes), .returnTypes = std::move(retValTypes)}};
     }
 
     std::cerr << "Unexpected expression type!" << std::endl;
@@ -147,11 +188,11 @@ std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, const TypeI
 
 std::string printType(const type::Type &type) {
     if (std::holds_alternative<type::I64>(type)) {
-        return "i64";
+        return "INT_64";
     } else if (std::holds_alternative<type::Bool>(type)) {
-        return "bool";
+        return "BOOL";
     } else if (std::holds_alternative<type::String>(type)) {
-        return "string";
+        return "STRING";
     } else if (const auto &func = to<type::Function>(type)) {
         auto out = std::stringstream{};
         out << "(FUNCTION ( ";
@@ -164,47 +205,69 @@ std::string printType(const type::Type &type) {
         }
         out << "))";
         return out.str();
+    } else if (is<type::Struct>(type)) {
+        auto const &strct = as<type::Struct>(type);
+        auto out = std::stringstream{};
+
+        out << "(STRUCT ( ";
+        for (auto const &mType : strct.memberTypes) {
+            out << printType(mType) << " ";
+        }
+        out << "))";
+
+        return out.str();
     }
 
     std::cerr << "Unexpected type, index: " << type.index() << std::endl;
     assert(false);
 }
 
-TypeInfo resolveTypes(const ParserOutput &parserOutput) {
-    auto types = TypeInfo{};
+VarTypes resolveTypes(const ParserOutput &parserOutput) {
+    auto varTypes = VarTypes{};
+    auto typeDefs = generateTypeDefs(parserOutput.ast);
 
     for (const auto &stmt : parserOutput.ast) {
         if (is<AstNodeDeclaration>(stmt)) {
-            auto const &decl = as<AstNodeDeclaration>(stmt);
-            auto const &name = decl.variable.name;
+            auto const &[varIdent, typeIdent] = as<AstNodeDeclaration>(stmt);
 
-            auto type = getTypeFromName(decl.type.name);
+            if (varTypes.contains(varIdent.name)) {
+                std::cerr << varIdent.name << " has already been declared." << std::endl;
+                continue;
+            }
+
+            auto typeNameStr = std::string{typeIdent.name};
+            auto type = getTypeFromName(typeNameStr, typeDefs);
             if (!type) {
-                std::cerr << "Can't determine the type of " << name << std::endl;
+                std::cerr << "Can't determine the type of " << varIdent.name << ", " << typeNameStr
+                          << " does not name a type." << std::endl;
                 continue;
             }
 
-            types.insert_or_assign(name, *type);
+            varTypes.insert_or_assign(varIdent.name, *type);
+            continue;
+        }
 
-        } else if (std::holds_alternative<AstNodeAssignment>(stmt)) {
-            auto assignment = std::get<AstNodeAssignment>(stmt);
-            const auto &name = assignment.variable.name;
+        if (is<AstNodeVarAssignment>(stmt)) {
+            auto const &assignment = as<AstNodeVarAssignment>(stmt);
 
-            auto type = getExpressionType(assignment.value, types, parserOutput.functions);
+            auto const &varName = assignment.variable.name;
+
+            auto type = getExpressionType(assignment.value, varTypes, typeDefs, parserOutput.functions);
             if (!type) {
-                std::cerr << "Can't determine the type of " << name << std::endl;
+                std::cerr << "Can't determine the type of " << varName << std::endl;
                 continue;
             }
 
-            if (types.contains(name) && types.at(name) != *type) {
-                std::cerr << name << " redeclared with a different type (" << printType(types.at(name)) << " vs "
-                          << printType(*type) << ")" << std::endl;
+            if (varTypes.contains(varName) && varTypes.at(varName) != *type) {
+                std::cerr << varName << " redeclared with a different type (" << printType(varTypes.at(varName))
+                          << " vs " << printType(*type) << ")" << std::endl;
                 continue;
             }
 
-            types.insert_or_assign(name, *type);
+            varTypes.insert_or_assign(varName, *type);
+            continue;
         }
     }
 
-    return types;
+    return varTypes;
 }

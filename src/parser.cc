@@ -41,12 +41,14 @@ template <typename TokenType> [[nodiscard]] TokensSpan consumeUntil(TokensSpan t
 struct ParserContext {
     TokensSpan tokens;
     FuncDefs functions;
-    int nextFnId{0};
+    int nextId{0};
 };
 
-std::string generateNewFunctionName(ParserContext &ctx) { return "__temp_func_" + std::to_string(ctx.nextFnId++); }
+std::string generateNewFunctionName(ParserContext &ctx) { return "__temp_func_" + std::to_string(ctx.nextId++); }
 
 using TypedArgList = decltype(FunctionDefinition::arguments);
+
+template <typename FnConsume> using ConsumedType = std::invoke_result<FnConsume, ParserContext &>::type::value_type;
 
 std::optional<AstNodeExpr> consumeExpression(ParserContext &ctx);
 std::optional<AstNodeStmt> consumeStatement(ParserContext &ctx);
@@ -69,6 +71,28 @@ template <typename... TokenType> std::optional<Token> consumeTokenAnyOf(ParserCo
     return result;
 }
 
+template <typename FnGetElem, typename FnGetSep>
+requires std::invocable<FnGetElem, ParserContext &> && std::invocable<FnGetSep, ParserContext &>
+auto consumeDelimited(ParserContext &ctx, FnGetElem consumeElem, FnGetSep consumeSep)
+    -> std::vector<ConsumedType<FnGetElem>> {
+    using ElemType = ConsumedType<FnGetElem>;
+    auto result = std::vector<ElemType>{};
+
+    while (true) {
+        if (auto elem = consumeElem(ctx)) {
+            result.push_back(std::move(*elem));
+        } else {
+            break;
+        }
+
+        if (!consumeSep(ctx)) {
+            break;
+        }
+    }
+
+    return result;
+}
+
 std::optional<AstNodeExpr> consumeParenthesizedExpression(ParserContext &ctx) {
     if (!consumeToken<TokenLBrace>(ctx)) {
         std::cerr << "Expected an opening brace." << std::endl;
@@ -87,6 +111,23 @@ std::optional<AstNodeExpr> consumeParenthesizedExpression(ParserContext &ctx) {
     }
 
     return expr;
+}
+
+std::optional<TypedVariable> consumeTypedVariable(ParserContext &ctx) {
+    auto &tokens = ctx.tokens;
+
+    if (!peek<TokenIdentifier, TokenColon, TokenIdentifier>(tokens)) {
+        return {};
+    }
+
+    auto variable = consumeToken<TokenIdentifier>(ctx);
+    assert(consumeToken<TokenColon>(ctx));
+    auto typeName = consumeToken<TokenIdentifier>(ctx);
+
+    assert(variable);
+    assert(typeName);
+
+    return TypedVariable{.varName = std::move(*variable), .varType = std::move(*typeName)};
 }
 
 std::optional<TypedArgList> consumeTypedArgList(ParserContext &ctx) {
@@ -178,6 +219,26 @@ std::optional<AstNodeFuncRef> consumeFunctionDefinition(ParserContext &ctx) {
     ctx.functions[funcName] = std::move(funcDef);
 
     return AstNodeFuncRef{.generatedName = funcName};
+}
+
+std::optional<AstNodeStructDef> consumeStructDefinition(ParserContext &ctx) {
+    auto &tokens = ctx.tokens;
+
+    if (!peek<TokenKwStruct, TokenLCurBrace>(tokens)) {
+        std::cerr << "Expected a structure definition." << std::endl;
+        return {};
+    }
+    assert(consumeToken<TokenKwStruct>(ctx));
+    assert(consumeToken<TokenLCurBrace>(ctx));
+
+    auto members = consumeDelimited(ctx, consumeTypedVariable, consumeToken<TokenComma>);
+
+    if (!consumeToken<TokenRCurBrace>(ctx)) {
+        std::cerr << "Expected a closing curly brace." << std::endl;
+        return {};
+    }
+
+    return AstNodeStructDef{.members = std::move(members)};
 }
 
 std::optional<AstNodeScope> consumeScopedStmtList(ParserContext &ctx) {
@@ -369,21 +430,12 @@ std::optional<AstNodeExpr> consumeExpression(ParserContext &ctx) {
 }
 
 std::optional<AstNodeStmt> consumeDeclaration(ParserContext &ctx) {
-    auto &tokens = ctx.tokens;
-
-    if (!peek<TokenIdentifier, TokenColon, TokenIdentifier>(tokens)) {
-        std::cerr << "Declaration must consist of a variable name, a colon and a type name." << std::endl;
+    auto tVar = consumeTypedVariable(ctx);
+    if (!tVar) {
+        std::cerr << "Expected a variable declaration." << std::endl;
         return {};
     }
-
-    auto variable = consumeToken<TokenIdentifier>(ctx);
-    assert(consumeToken<TokenColon>(ctx));
-    auto typeName = consumeToken<TokenIdentifier>(ctx);
-
-    assert(variable);
-    assert(typeName);
-
-    return AstNodeStmt{AstNodeDeclaration{.variable = std::move(*variable), .type = std::move(*typeName)}};
+    return AstNodeStmt{AstNodeDeclaration{.variable = std::move(tVar->varName), .type = std::move(tVar->varType)}};
 }
 
 std::optional<AstNodeStmt> consumeAssignment(ParserContext &ctx) {
@@ -394,18 +446,27 @@ std::optional<AstNodeStmt> consumeAssignment(ParserContext &ctx) {
         return {};
     }
 
-    auto variable = std::optional<TokenIdentifier>{};
-    std::tie(variable, tokens) = consume<TokenIdentifier>(tokens);
-    assert(variable.has_value());
-    std::tie(std::ignore, tokens) = consume<TokenAssignment>(tokens);
+    auto name = consumeToken<TokenIdentifier>(ctx);
+    assert(name.has_value());
+    assert(consumeToken<TokenAssignment>(ctx));
+
+    if (peek<TokenKwStruct>(tokens)) {
+        auto structDef = consumeStructDefinition(ctx);
+        if (!structDef) {
+            std::cerr << "Expected a struct definition." << std::endl;
+            return {};
+        }
+
+        auto structDecl = AstNodeStructDecl{.name = std::move(*name), .definition = std::move(*structDef)};
+        return AstNodeStmt{std::move(structDecl)};
+    }
 
     auto expr = consumeExpression(ctx);
     if (!expr) {
         std::cerr << "Expected an expression" << std::endl;
         return {};
     }
-
-    return AstNodeStmt{AstNodeAssignment{.variable = std::move(*variable), .value = std::move(*expr)}};
+    return AstNodeStmt{AstNodeVarAssignment{.variable = std::move(*name), .value = std::move(*expr)}};
 }
 
 template <typename InitialKeyword>

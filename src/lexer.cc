@@ -81,6 +81,10 @@ std::pair<std::optional<Token>, std::string_view> consumeIdentifierOrKeyword(std
         return {TokenKwFn{}, input};
     }
 
+    if (tokenVal == "struct") {
+        return {TokenKwStruct{}, input};
+    }
+
     if (tokenVal == "if") {
         return {TokenKwIf{}, input};
     }

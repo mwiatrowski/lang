@@ -28,14 +28,19 @@ struct Function {
     auto operator<=>(const Function &) const = default;
 };
 
-struct Type : public std::variant<I64, Bool, String, Function> {
-    using std::variant<I64, Bool, String, Function>::variant;
+struct Struct {
+    std::vector<Type> memberTypes;
+
+    auto operator<=>(const Struct &) const = default;
 };
+
+struct Type : public std::variant<I64, Bool, String, Function, Struct> {};
 
 } // namespace type
 
 std::string printType(const type::Type &type);
 
-using TypeInfo = std::unordered_map<std::string_view, type::Type>;
+using VarTypes = std::unordered_map<std::string_view, type::Type>;
+using TypeDefs = std::unordered_map<std::string, type::Type>;
 
-TypeInfo resolveTypes(const ParserOutput &parserOutput);
+VarTypes resolveTypes(const ParserOutput &parserOutput);

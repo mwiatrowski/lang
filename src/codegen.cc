@@ -239,7 +239,7 @@ void writeDeclaration(std::ostream &output, DeclaredVars &declared, AstNodeDecla
     declared.insert(varName);
 }
 
-void writeAssignment(std::ostream &output, DeclaredVars &declared, const AstNodeAssignment &assignment) {
+void writeAssignment(std::ostream &output, DeclaredVars &declared, const AstNodeVarAssignment &assignment) {
     const auto varName = std::string{assignment.variable.name};
     auto tmpVar = writeTemporaryAssignment(output, assignment.value);
 
@@ -303,13 +303,18 @@ void writeWhileLoop(std::ostream &output, DeclaredVars &declared, AstNodeWhileLo
 }
 
 void writeStatement(std::ostream &output, DeclaredVars &declared, const AstNodeStmt &stmt) {
+    if (is<AstNodeStructDecl>(stmt)) {
+        std::cerr << "Code generation for user-defined structs is not implemented yet." << std::endl;
+        return;
+    }
+
     if (is<AstNodeDeclaration>(stmt)) {
         auto const &decl = as<AstNodeDeclaration>(stmt);
         writeDeclaration(output, declared, decl);
         return;
     }
 
-    if (const auto &assignment = to<AstNodeAssignment>(stmt)) {
+    if (const auto &assignment = to<AstNodeVarAssignment>(stmt)) {
         writeAssignment(output, declared, *assignment);
         return;
     }

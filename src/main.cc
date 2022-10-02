@@ -63,7 +63,7 @@ void startCompilation(CompilationOptions const &options) {
 
     auto parserOutput = parseSourceFile(tokens);
     if (options.printAst) {
-        std::cout << printAst(parserOutput.ast, parserOutput.functions) << std::endl;
+        std::cout << printAst(parserOutput) << std::endl;
     }
 
     auto typeInfo = resolveTypes(parserOutput);

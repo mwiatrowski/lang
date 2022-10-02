@@ -74,13 +74,27 @@ std::string printStatement(const AstNodeStmt &stmt, const FuncDefs &functions) {
         return printExpression(AstNodeExpr{funcCall}, functions);
     }
 
-    if (is<AstNodeDeclaration>(stmt)) {
-        auto const &decl = as<AstNodeDeclaration>(stmt);
-        return std::string{decl.variable.name} + " HAS TYPE " + std::string{decl.type.name};
+    if (is<AstNodeStructDecl>(stmt)) {
+        auto const &structDecl = to<AstNodeStructDecl>(stmt);
+
+        auto out = std::stringstream{};
+
+        out << "(STRUCT " << structDecl->name.name << "\n";
+        for (auto const &[memberName, memberType] : structDecl->definition.members) {
+            out << "MEMBER " << memberName.name << " TYPE " << memberType.name << '\n';
+        }
+        out << ")";
+
+        return out.str();
     }
 
-    if (std::holds_alternative<AstNodeAssignment>(stmt)) {
-        auto assignment = std::get<AstNodeAssignment>(stmt);
+    if (is<AstNodeDeclaration>(stmt)) {
+        auto const &decl = as<AstNodeDeclaration>(stmt);
+        return std::string{decl.variable.name} + " HAS_TYPE " + std::string{decl.type.name};
+    }
+
+    if (std::holds_alternative<AstNodeVarAssignment>(stmt)) {
+        auto assignment = std::get<AstNodeVarAssignment>(stmt);
         return std::string{assignment.variable.name} +
                " := " + printExpression(AstNodeExpr{assignment.value}, functions);
     }
@@ -139,12 +153,12 @@ std::string printStatement(const AstNodeStmt &stmt, const FuncDefs &functions) {
 
 } // namespace
 
-std::string printAst(StmtList const &ast, FuncDefs const &functions) {
+std::string printAst(ProgramDescription const &program) {
     auto stream = std::stringstream{};
 
     stream << "(" << std::endl;
-    for (const auto &stmt : ast) {
-        stream << printStatement(stmt, functions) << std::endl;
+    for (const auto &stmt : program.ast) {
+        stream << printStatement(stmt, program.functions) << std::endl;
     }
     stream << ")" << std::endl;
 

@@ -52,6 +52,8 @@ std::string printToken(const Token &token) {
         return "(BOOL_LITERAL " + std::string{boolLiteral.value ? "true" : "false"} + ")";
     } else if (std::holds_alternative<TokenKwFn>(token)) {
         return "FN";
+    } else if (std::holds_alternative<TokenKwStruct>(token)) {
+        return "STRUCT";
     } else if (std::holds_alternative<TokenKwIf>(token)) {
         return "IF";
     } else if (std::holds_alternative<TokenKwElif>(token)) {

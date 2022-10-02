@@ -7,9 +7,6 @@
 
 using TokensSpan = std::span<const Token>;
 
-struct ParserOutput {
-    StmtList ast;
-    FuncDefs functions;
-};
+using ParserOutput = ProgramDescription;
 
 ParserOutput parseSourceFile(TokensSpan tokens);

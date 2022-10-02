@@ -46,12 +46,26 @@ struct AstNodeFuncRef {
 struct AstNodeExpr : public std::variant<AstNodeIntLiteral, AstNodeStringLiteral, AstNodeBoolLiteral, AstNodeIdentifier,
                                          AstNodeFuncCall, AstNodeBinaryOp, AstNodeNegation, AstNodeFuncRef> {};
 
+struct TypedVariable {
+    TokenIdentifier varName;
+    TokenIdentifier varType;
+};
+
+struct AstNodeStructDef {
+    std::vector<TypedVariable> members;
+};
+
+struct AstNodeStructDecl {
+    TokenIdentifier name;
+    AstNodeStructDef definition;
+};
+
 struct AstNodeDeclaration {
     TokenIdentifier variable;
     TokenIdentifier type;
 };
 
-struct AstNodeAssignment {
+struct AstNodeVarAssignment {
     TokenIdentifier variable;
     AstNodeExpr value;
 };
@@ -74,17 +88,13 @@ struct AstNodeWhileLoop {
 struct AstNodeBreakStmt {};
 struct AstNodeContinueStmt {};
 
-struct AstNodeStmt : public std::variant<AstNodeDeclaration, AstNodeAssignment, AstNodeFuncCall, AstNodeScope,
-                                         AstNodeIfBlock, AstNodeWhileLoop, AstNodeBreakStmt, AstNodeContinueStmt> {};
+struct AstNodeStmt
+    : public std::variant<AstNodeStructDecl, AstNodeDeclaration, AstNodeVarAssignment, AstNodeFuncCall, AstNodeScope,
+                          AstNodeIfBlock, AstNodeWhileLoop, AstNodeBreakStmt, AstNodeContinueStmt> {};
 
 struct Branch {
     AstNodeExpr condition;
     AstNodeStmt body;
-};
-
-struct TypedVariable {
-    TokenIdentifier varName;
-    TokenIdentifier varType;
 };
 
 struct FunctionDefinition {
@@ -95,4 +105,9 @@ struct FunctionDefinition {
 
 using FuncDefs = std::unordered_map<std::string, FunctionDefinition>;
 
-std::string printAst(StmtList const &ast, FuncDefs const &functions);
+struct ProgramDescription {
+    StmtList ast;
+    FuncDefs functions;
+};
+
+std::string printAst(ProgramDescription const &program);

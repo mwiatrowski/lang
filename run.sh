@@ -4,6 +4,7 @@ L_GREEN='\033[1;32m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
+clang-format -i src/* &&
 mkdir -p build &&
 cd build &&
 cmake .. &&
@@ -23,3 +24,5 @@ for SOURCE in ../examples/*.lg; do
     echo -e "${CYAN}Running the compiled program${NC}" &&
     ./compiled.out < ../examples/lorem_ipsum.txt
 done
+
+clang-format -i *transpiled.cc
