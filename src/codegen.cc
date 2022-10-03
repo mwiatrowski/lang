@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <iostream>
+#include <ranges>
 #include <sstream>
 #include <string>
 #include <unordered_set>
@@ -57,6 +58,10 @@ std::string typeNameToCppTypeName(TokenIdentifier typeName) {
 
     if (name == "str") {
         return "std::string";
+    }
+
+    if (name == "bool") {
+        return "bool";
     }
 
     return std::string{name};
@@ -304,7 +309,7 @@ void writeWhileLoop(std::ostream &output, DeclaredVars &declared, AstNodeWhileLo
 
 void writeStatement(std::ostream &output, DeclaredVars &declared, const AstNodeStmt &stmt) {
     if (is<AstNodeStructDecl>(stmt)) {
-        std::cerr << "Code generation for user-defined structs is not implemented yet." << std::endl;
+        // Handled elsewhere.
         return;
     }
 
@@ -389,6 +394,27 @@ void writeFunctionDefinition(std::ostream &output, const std::string &name, cons
     output << "}" << std::endl;
 }
 
+void writeStruct(std::ostream &output, AstNodeStructDecl const &structDecl) {
+    auto const &name = structDecl.name.name;
+    auto const &members = structDecl.definition.members;
+
+    output << "struct " << name << "{\n";
+    for (auto const &[varName, varType] : members) {
+        output << typeNameToCppTypeName(varType) << " " << varName.name << ";\n";
+    }
+    output << "};\n";
+}
+
+void writeUserStructs(std::ostream &output, StmtList const &stmts) {
+    auto structs = std::span(stmts.begin(), stmts.end()) |
+                   std::views::filter([](auto const &stmt) { return is<AstNodeStructDecl>(stmt); }) |
+                   std::views::transform([](auto const &stmt) { return as<AstNodeStructDecl>(stmt); });
+
+    for (auto const &structDecl : structs) {
+        writeStruct(output, structDecl);
+    }
+}
+
 void writeUserFunctions(std::ostream &output, const FuncDefs &funcDefs) {
     (void)funcDefs;
 
@@ -416,6 +442,7 @@ void writeMain(std::ostream &output, const StmtList &ast) {
 std::string generateCode(const ParserOutput &parserOutput) {
     auto output = std::stringstream{};
     writeStdLib(output);
+    writeUserStructs(output, parserOutput.ast);
     writeUserFunctions(output, parserOutput.functions);
     writeMain(output, parserOutput.ast);
     return output.str();

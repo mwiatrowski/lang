@@ -5,12 +5,12 @@ int_pair := struct {
 
 p : int_pair
 
-# p.first = 3
-# p.second = 5
-# println(p.first)
-# println(p.second)
+p.first := 3
+p.second := 5
+println(p.first)
+println(p.second)
 
-# p = [ 7, 8 ]
-# [ f, s ] = p
+# p := [ 7, 8 ]
+# [ f, s ] := p
 # println(f)
 # println(s)
