@@ -20,6 +20,8 @@ std::string printToken(const Token &token) {
         return "COLON";
     } else if (std::holds_alternative<TokenRArrow>(token)) {
         return "R_ARROW";
+    } else if (is<TokenDot>(token)) {
+        return "DOT";
     } else if (std::holds_alternative<TokenPlus>(token)) {
         return "PLUS";
     } else if (std::holds_alternative<TokenMinus>(token)) {

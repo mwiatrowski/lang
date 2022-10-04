@@ -176,6 +176,10 @@ std::pair<std::optional<Token>, std::string_view> consumeOneToken(std::string_vi
         return {TokenRArrow{}, input.substr(2)};
     }
 
+    if (front == '.') {
+        return {TokenDot{}, input.substr(1)};
+    }
+
     if (front == '-') {
         return {TokenMinus{}, input.substr(1)};
     }

@@ -13,6 +13,7 @@ struct TokenRCurBrace {};
 struct TokenComma {};
 struct TokenColon {};
 struct TokenRArrow {};
+struct TokenDot {};
 
 struct TokenPlus {};
 struct TokenMinus {};
@@ -53,7 +54,7 @@ struct TokenKwBreak {};
 struct TokenKwContinue {};
 
 using Token = std::variant<TokenLBrace, TokenRBrace, TokenLCurBrace, TokenRCurBrace, TokenComma, TokenColon,
-                           TokenRArrow, TokenPlus, TokenMinus, TokenLess, TokenLessOrEqual, TokenGreater,
+                           TokenRArrow, TokenDot, TokenPlus, TokenMinus, TokenLess, TokenLessOrEqual, TokenGreater,
                            TokenGreaterOrEqual, TokenEqual, TokenNotEqual, TokenAssignment, TokenIdentifier,
                            TokenStringLiteral, TokenIntLiteral, TokenBoolLiteral, TokenKwFn, TokenKwStruct, TokenKwIf,
                            TokenKwElif, TokenKwElse, TokenKwWhile, TokenKwBreak, TokenKwContinue>;
