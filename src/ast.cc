@@ -95,8 +95,7 @@ std::string printStatement(const AstNodeStmt &stmt, const FuncDefs &functions) {
 
     if (std::holds_alternative<AstNodeVarAssignment>(stmt)) {
         auto assignment = std::get<AstNodeVarAssignment>(stmt);
-        return std::string{assignment.variable.name} +
-               " := " + printExpression(AstNodeExpr{assignment.value}, functions);
+        return printExpression(assignment.lhs, functions) + " := " + printExpression(assignment.rhs, functions);
     }
 
     if (const auto scope = to<AstNodeScope>(stmt)) {

@@ -461,12 +461,14 @@ std::optional<AstNodeStmt> consumeAssignment(ParserContext &ctx) {
         return AstNodeStmt{std::move(structDecl)};
     }
 
-    auto expr = consumeExpression(ctx);
-    if (!expr) {
+    auto rhs = consumeExpression(ctx);
+    if (!rhs) {
         std::cerr << "Expected an expression" << std::endl;
         return {};
     }
-    return AstNodeStmt{AstNodeVarAssignment{.variable = std::move(*name), .value = std::move(*expr)}};
+
+    return AstNodeStmt{
+        AstNodeVarAssignment{.lhs = AstNodeExpr{AstNodeIdentifier{std::move(*name)}}, .rhs = std::move(*rhs)}};
 }
 
 template <typename InitialKeyword>

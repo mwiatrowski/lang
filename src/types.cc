@@ -250,9 +250,13 @@ VarTypes resolveTypes(const ParserOutput &parserOutput) {
         if (is<AstNodeVarAssignment>(stmt)) {
             auto const &assignment = as<AstNodeVarAssignment>(stmt);
 
-            auto const &varName = assignment.variable.name;
+            if (!is<AstNodeIdentifier>(assignment.lhs)) {
+                std::cerr << "Right now the left-hand side of an assignment must be an identifier." << std::endl;
+                continue;
+            }
+            auto const &varName = as<AstNodeIdentifier>(assignment.lhs).value.name;
 
-            auto type = getExpressionType(assignment.value, varTypes, typeDefs, parserOutput.functions);
+            auto type = getExpressionType(assignment.rhs, varTypes, typeDefs, parserOutput.functions);
             if (!type) {
                 std::cerr << "Can't determine the type of " << varName << std::endl;
                 continue;

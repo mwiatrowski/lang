@@ -245,8 +245,13 @@ void writeDeclaration(std::ostream &output, DeclaredVars &declared, AstNodeDecla
 }
 
 void writeAssignment(std::ostream &output, DeclaredVars &declared, const AstNodeVarAssignment &assignment) {
-    const auto varName = std::string{assignment.variable.name};
-    auto tmpVar = writeTemporaryAssignment(output, assignment.value);
+    if (!is<AstNodeIdentifier>(assignment.lhs)) {
+        std::cerr << "Right now the left-hand side of an assignment must be an identifier." << std::endl;
+        return;
+    }
+
+    const auto varName = std::string{as<AstNodeIdentifier>(assignment.lhs).value.name};
+    auto tmpVar = writeTemporaryAssignment(output, assignment.rhs);
 
     if (!declared.contains(varName)) {
         output << "auto ";

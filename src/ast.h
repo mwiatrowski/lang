@@ -60,14 +60,15 @@ struct AstNodeStructDecl {
     AstNodeStructDef definition;
 };
 
+// TODO unify with variable assignment
 struct AstNodeDeclaration {
     TokenIdentifier variable;
     TokenIdentifier type;
 };
 
 struct AstNodeVarAssignment {
-    TokenIdentifier variable;
-    AstNodeExpr value;
+    AstNodeExpr lhs;
+    AstNodeExpr rhs;
 };
 
 struct AstNodeScope {
