@@ -439,10 +439,31 @@ std::optional<AstNodeStmt> consumeDeclaration(ParserContext &ctx) {
 }
 
 std::optional<AstNodeStmt> consumeAssignment(ParserContext &ctx) {
+    auto lhs = consumeExpression(ctx);
+    if (!lhs) {
+        std::cerr << "Expected an assignment left-hand side." << std::endl;
+        return {};
+    }
+
+    if (!consumeToken<TokenAssignment>(ctx)) {
+        std::cerr << "Expected an assignment operator." << std::endl;
+        return {};
+    }
+
+    auto rhs = consumeExpression(ctx);
+    if (!rhs) {
+        std::cerr << "Expected an assignment right-hand side." << std::endl;
+        return {};
+    }
+
+    return AstNodeStmt{AstNodeVarAssignment{.lhs = std::move(*lhs), .rhs = std::move(*rhs)}};
+}
+
+std::optional<AstNodeStmt> consumeStructDeclaration(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
 
-    if (!peek<TokenIdentifier, TokenAssignment>(tokens)) {
-        std::cerr << "Assignment must start with a variable name and an assignment operator." << std::endl;
+    if (!peek<TokenIdentifier, TokenAssignment, TokenKwStruct>(tokens)) {
+        std::cerr << "Expected a struct declaration." << std::endl;
         return {};
     }
 
@@ -450,25 +471,14 @@ std::optional<AstNodeStmt> consumeAssignment(ParserContext &ctx) {
     assert(name.has_value());
     assert(consumeToken<TokenAssignment>(ctx));
 
-    if (peek<TokenKwStruct>(tokens)) {
-        auto structDef = consumeStructDefinition(ctx);
-        if (!structDef) {
-            std::cerr << "Expected a struct definition." << std::endl;
-            return {};
-        }
-
-        auto structDecl = AstNodeStructDecl{.name = std::move(*name), .definition = std::move(*structDef)};
-        return AstNodeStmt{std::move(structDecl)};
-    }
-
-    auto rhs = consumeExpression(ctx);
-    if (!rhs) {
-        std::cerr << "Expected an expression" << std::endl;
+    auto structDef = consumeStructDefinition(ctx);
+    if (!structDef) {
+        std::cerr << "Expected a struct definition." << std::endl;
         return {};
     }
 
-    return AstNodeStmt{
-        AstNodeVarAssignment{.lhs = AstNodeExpr{AstNodeIdentifier{std::move(*name)}}, .rhs = std::move(*rhs)}};
+    auto structDecl = AstNodeStructDecl{.name = std::move(*name), .definition = std::move(*structDef)};
+    return AstNodeStmt{std::move(structDecl)};
 }
 
 template <typename InitialKeyword>
@@ -573,10 +583,6 @@ std::optional<AstNodeStmt> consumeStatement(ParserContext &ctx) {
         return consumeDeclaration(ctx);
     }
 
-    if (peek<TokenIdentifier, TokenAssignment>(tokens)) {
-        return consumeAssignment(ctx);
-    }
-
     if (peek<TokenIdentifier, TokenLBrace>(tokens)) {
         auto funcCall = consumeFunctionCall(ctx);
         if (!funcCall) {
@@ -613,8 +619,11 @@ std::optional<AstNodeStmt> consumeStatement(ParserContext &ctx) {
         return AstNodeStmt{AstNodeContinueStmt{}};
     }
 
-    std::cerr << "Failed to parse a statement" << std::endl;
-    return {};
+    if (peek<TokenIdentifier, TokenAssignment, TokenKwStruct>(tokens)) {
+        return consumeStructDeclaration(ctx);
+    }
+
+    return consumeAssignment(ctx);
 }
 
 StmtList consumeStmtList(ParserContext &ctx) {
