@@ -380,8 +380,8 @@ std::optional<AstNodeExpr> consumeBasicExpression(ParserContext &ctx) {
 }
 
 std::optional<Token> consumeBinaryOperator(ParserContext &ctx) {
-    return consumeTokenAnyOf<TokenPlus, TokenMinus, TokenLess, TokenLessOrEqual, TokenGreater, TokenGreaterOrEqual,
-                             TokenEqual, TokenNotEqual>(ctx);
+    return consumeTokenAnyOf<TokenDot, TokenPlus, TokenMinus, TokenLess, TokenLessOrEqual, TokenGreater,
+                             TokenGreaterOrEqual, TokenEqual, TokenNotEqual>(ctx);
 }
 
 std::optional<AstNodeExpr> consumeExpression(ParserContext &ctx) {

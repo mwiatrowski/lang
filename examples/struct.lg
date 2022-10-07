@@ -14,3 +14,8 @@ println(p.second)
 # [ f, s ] := p
 # println(f)
 # println(s)
+
+int_pair_pair := struct {
+    first: int_pair,
+    second: int_pair
+}

@@ -28,13 +28,21 @@ struct Function {
     auto operator<=>(const Function &) const = default;
 };
 
+struct Member;
 struct Struct {
-    std::vector<Type> memberTypes;
+    std::vector<Member> members;
 
     auto operator<=>(const Struct &) const = default;
 };
 
 struct Type : public std::variant<I64, Bool, String, Function, Struct> {};
+
+struct Member {
+    std::string_view name;
+    type::Type type;
+
+    auto operator<=>(Member const &) const = default;
+};
 
 } // namespace type
 

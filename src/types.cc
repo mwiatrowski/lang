@@ -46,24 +46,51 @@ auto generateTypeDefs(StmtList const &statements) -> TypeDefs {
     // TODO: This scheme doesn't handle out-of-order struct definitions.
 
     for (auto const &[structNameIdent, structDef] : structs) {
-        auto mTypes = std::vector<type::Type>{};
-        mTypes.reserve(structDef.members.size());
+        auto structName = std::string{structNameIdent.name};
 
-        for (auto const &member : structDef.members) {
-            if (auto type = getTypeFromName(member.varType.name, typeDefs)) {
-                mTypes.push_back(*type);
-            } else {
-                std::cerr << "Couldn't determine the type of a struct member." << std::endl;
-                return {};
+        auto members = std::vector<type::Member>{};
+        members.reserve(structDef.members.size());
+
+        for (auto const &[varName, varType] : structDef.members) {
+            auto mTypeName = std::string{varType.name};
+            if (!typeDefs.contains(mTypeName)) {
+                std::cerr << "Unknown type of struct member: " << mTypeName << std::endl;
+                continue;
             }
+            auto mType = typeDefs.at(mTypeName);
+            members.emplace_back(varName.name, std::move(mType));
         }
 
-        auto structName = std::string{structNameIdent.name};
-        auto structType = type::Struct{.memberTypes = std::move(mTypes)};
+        auto structType = type::Struct{.members = std::move(members)};
         typeDefs.insert_or_assign(structName, type::Type{std::move(structType)});
     }
 
     return typeDefs;
+}
+
+std::optional<type::Type> getMemberType(type::Type const &lhsType, AstNodeExpr const &rhs) {
+    if (!is<type::Struct>(lhsType)) {
+        std::cerr << "Expected an expression of struct type." << std::endl;
+        return {};
+    }
+    auto const &structType = as<type::Struct>(lhsType);
+
+    if (!is<AstNodeIdentifier>(rhs)) {
+        std::cerr << "Expected a member name." << std::endl;
+        return {};
+    }
+    auto const &memberName = as<AstNodeIdentifier>(rhs).value.name;
+
+    auto memberDef = std::ranges::find_if(structType.members,
+                                          [&memberName](auto const &member) { return member.name == memberName; });
+    if (memberDef == structType.members.end()) {
+        std::cerr << "Struct " << printType(lhsType) << " doesn't have a member named '" << memberName << "'."
+                  << std::endl;
+        return {};
+    }
+    auto const &[mName, mType] = *memberDef;
+
+    return mType;
 }
 
 std::optional<type::Type> getBinaryOperationType(Token const &op, type::Type const &lhsType,
@@ -132,10 +159,23 @@ std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, VarTypes co
     }
 
     if (auto const binaryOp = to<AstNodeBinaryOp>(expr)) {
-        const auto lhsType = getExpressionType(binaryOp->operands[0], varTypes, typeDefs, funcDefs);
-        const auto rhsType = getExpressionType(binaryOp->operands[1], varTypes, typeDefs, funcDefs);
-        if (!lhsType || !rhsType) {
-            std::cerr << "Couldn't determine the type of one of the operands." << std::endl;
+        auto const &lhs = binaryOp->operands[0];
+        auto const &rhs = binaryOp->operands[1];
+
+        const auto lhsType = getExpressionType(lhs, varTypes, typeDefs, funcDefs);
+        if (!lhsType) {
+            std::cerr << "Couldn't determine the type of left-hand side." << std::endl;
+            return {};
+        }
+
+        // For now member access is the only special case.
+        if (is<TokenDot>(binaryOp->op)) {
+            return getMemberType(*lhsType, rhs);
+        }
+
+        const auto rhsType = getExpressionType(rhs, varTypes, typeDefs, funcDefs);
+        if (!rhsType) {
+            std::cerr << "Couldn't determine the type of right-hand side." << std::endl;
             return {};
         }
 
@@ -210,8 +250,8 @@ std::string printType(const type::Type &type) {
         auto out = std::stringstream{};
 
         out << "(STRUCT ( ";
-        for (auto const &mType : strct.memberTypes) {
-            out << printType(mType) << " ";
+        for (auto const &[mName, mType] : strct.members) {
+            out << "(" << mName << ": " << printType(mType) << ") ";
         }
         out << "))";
 
@@ -251,7 +291,7 @@ VarTypes resolveTypes(const ParserOutput &parserOutput) {
             auto const &assignment = as<AstNodeVarAssignment>(stmt);
 
             if (!is<AstNodeIdentifier>(assignment.lhs)) {
-                std::cerr << "Right now the left-hand side of an assignment must be an identifier." << std::endl;
+                std::cerr << "Can't typecheck assignments with complex left-hand side." << std::endl;
                 continue;
             }
             auto const &varName = as<AstNodeIdentifier>(assignment.lhs).value.name;

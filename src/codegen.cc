@@ -125,12 +125,12 @@ void writeReturnStatement(std::ostream &output, std::vector<TypedVariable> const
     output << ");" << std::endl;
 }
 
-std::string writeTemporaryAssignment(std::ostream &output, const AstNodeExpr &expr);
+std::string writeTemporaryAssignment(std::ostream &output, const AstNodeExpr &expr, bool isRef);
 
 std::string generateFuncCallStr(std::ostream &output, const AstNodeFuncCall &funcCall) {
     auto args = std::vector<std::string>{};
     for (const auto &argExpr : funcCall.arguments) {
-        args.emplace_back(writeTemporaryAssignment(output, argExpr));
+        args.emplace_back(writeTemporaryAssignment(output, argExpr, false));
     }
 
     auto funcCallStr = std::stringstream{};
@@ -147,6 +147,10 @@ std::string generateFuncCallStr(std::ostream &output, const AstNodeFuncCall &fun
 }
 
 char const *getBinaryOperationStr(Token const &op) {
+    if (is<TokenDot>(op)) {
+        return ".";
+    }
+
     if (to<TokenPlus>(op)) {
         return "+";
     }
@@ -176,10 +180,10 @@ char const *getBinaryOperationStr(Token const &op) {
     assert(false);
 }
 
-std::string writeTemporaryAssignment(std::ostream &output, const AstNodeExpr &expr) {
-    auto writeDecl = [&output](const auto &value) -> std::string {
+std::string writeTemporaryAssignment(std::ostream &output, const AstNodeExpr &expr, bool isRef) {
+    auto writeDecl = [&output, &isRef](const auto &value) -> std::string {
         auto name = getTmpVarName();
-        output << "auto " << name << " = " << value << ";\n";
+        output << (isRef ? "auto &" : "auto ") << name << " = " << value << ";\n";
         return name;
     };
 
@@ -208,15 +212,25 @@ std::string writeTemporaryAssignment(std::ostream &output, const AstNodeExpr &ex
 
     if (auto const binaryOp = to<AstNodeBinaryOp>(expr)) {
         assert(binaryOp->operands.size() == 2);
-        auto lhs = writeTemporaryAssignment(output, binaryOp->operands[0]);
-        auto rhs = writeTemporaryAssignment(output, binaryOp->operands[1]);
+        auto lhs = writeTemporaryAssignment(output, binaryOp->operands[0], isRef);
+
+        if (is<TokenDot>(binaryOp->op)) {
+            if (!is<AstNodeIdentifier>(binaryOp->operands[1])) {
+                std::cerr << "Expected a member name." << std::endl;
+                return writeDecl("nullptr");
+            }
+            auto mName = as<AstNodeIdentifier>(binaryOp->operands[1]).value.name;
+            return writeDecl(lhs + "." + std::string{mName});
+        }
+
+        auto rhs = writeTemporaryAssignment(output, binaryOp->operands[1], isRef);
         auto const *op = getBinaryOperationStr(binaryOp->op);
         return writeDecl(lhs + " " + op + " " + rhs);
     }
 
     if (const auto negation = to<AstNodeNegation>(expr)) {
         assert(negation->operands.size() == 1);
-        auto rhs = writeTemporaryAssignment(output, negation->operands[0]);
+        auto rhs = writeTemporaryAssignment(output, negation->operands[0], isRef);
         return writeDecl("-" + rhs);
     }
 
@@ -245,19 +259,24 @@ void writeDeclaration(std::ostream &output, DeclaredVars &declared, AstNodeDecla
 }
 
 void writeAssignment(std::ostream &output, DeclaredVars &declared, const AstNodeVarAssignment &assignment) {
-    if (!is<AstNodeIdentifier>(assignment.lhs)) {
-        std::cerr << "Right now the left-hand side of an assignment must be an identifier." << std::endl;
-        return;
+    auto lhs = std::string{};
+    bool declareNewVar = false;
+
+    if (is<AstNodeIdentifier>(assignment.lhs)) {
+        auto varName = std::string{as<AstNodeIdentifier>(assignment.lhs).value.name};
+        if (!declared.contains(varName)) {
+            lhs = varName;
+            declareNewVar = true;
+            declared.insert(varName);
+        }
     }
 
-    const auto varName = std::string{as<AstNodeIdentifier>(assignment.lhs).value.name};
-    auto tmpVar = writeTemporaryAssignment(output, assignment.rhs);
-
-    if (!declared.contains(varName)) {
-        output << "auto ";
-        declared.insert(varName);
+    if (!declareNewVar) {
+        lhs = writeTemporaryAssignment(output, assignment.lhs, true);
     }
-    output << varName << " = " << tmpVar << ";\n";
+
+    auto rhs = writeTemporaryAssignment(output, assignment.rhs, false);
+    output << (declareNewVar ? "auto " : "") << lhs << " = " << rhs << ";\n";
 }
 
 void writeStatementList(std::ostream &output, DeclaredVars &declared, const StmtList &stmts);
@@ -279,7 +298,7 @@ void writeIfElifElse(std::ostream &output, DeclaredVars &declared, AstNodeIfBloc
     auto nestingLevel = 0;
 
     for (auto const &[condition, body] : ifElifElse.brIfElif) {
-        auto condVar = writeTemporaryAssignment(output, condition);
+        auto condVar = writeTemporaryAssignment(output, condition, false);
         output << "if (" << condVar << ") {\n";
         writeStatement(output, declared, body);
         output << "} else {\n";
@@ -304,7 +323,7 @@ void writeWhileLoop(std::ostream &output, DeclaredVars &declared, AstNodeWhileLo
     auto declaredBefore = declared;
 
     output << "while (true) {\n";
-    auto condVar = writeTemporaryAssignment(output, loop.condition);
+    auto condVar = writeTemporaryAssignment(output, loop.condition, false);
     output << "if (!" << condVar << ") { break; }\n";
     writeStatement(output, declared, loop.body.front());
     output << "}\n";
