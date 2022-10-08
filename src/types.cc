@@ -68,23 +68,19 @@ auto generateTypeDefs(StmtList const &statements) -> TypeDefs {
     return typeDefs;
 }
 
-std::optional<type::Type> getMemberType(type::Type const &lhsType, AstNodeExpr const &rhs) {
-    if (!is<type::Struct>(lhsType)) {
+std::optional<type::Type> getMemberType(type::Type const &objType, TokenIdentifier const &member) {
+    if (!is<type::Struct>(objType)) {
         std::cerr << "Expected an expression of struct type." << std::endl;
         return {};
     }
-    auto const &structType = as<type::Struct>(lhsType);
+    auto const &structType = as<type::Struct>(objType);
 
-    if (!is<AstNodeIdentifier>(rhs)) {
-        std::cerr << "Expected a member name." << std::endl;
-        return {};
-    }
-    auto const &memberName = as<AstNodeIdentifier>(rhs).value.name;
+    auto const &memberName = member.name;
 
     auto memberDef = std::ranges::find_if(structType.members,
                                           [&memberName](auto const &member) { return member.name == memberName; });
     if (memberDef == structType.members.end()) {
-        std::cerr << "Struct " << printType(lhsType) << " doesn't have a member named '" << memberName << "'."
+        std::cerr << "Struct " << printType(objType) << " doesn't have a member named '" << memberName << "'."
                   << std::endl;
         return {};
     }
@@ -168,11 +164,6 @@ std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, VarTypes co
             return {};
         }
 
-        // For now member access is the only special case.
-        if (is<TokenDot>(binaryOp->op)) {
-            return getMemberType(*lhsType, rhs);
-        }
-
         const auto rhsType = getExpressionType(rhs, varTypes, typeDefs, funcDefs);
         if (!rhsType) {
             std::cerr << "Couldn't determine the type of right-hand side." << std::endl;
@@ -218,6 +209,19 @@ std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, VarTypes co
         }
 
         return type::Type{type::Function{.inputTypes = std::move(argTypes), .returnTypes = std::move(retValTypes)}};
+    }
+
+    if (is<AstNodeMemberAccess>(expr)) {
+        auto const &memAcc = as<AstNodeMemberAccess>(expr);
+        assert(memAcc.object.size() == 1);
+
+        auto objType = getExpressionType(memAcc.object.front(), varTypes, typeDefs, funcDefs);
+        if (!objType) {
+            std::cerr << "Couldn't determine the type of the object." << std::endl;
+            return {};
+        }
+
+        return getMemberType(*objType, memAcc.member);
     }
 
     std::cerr << "Unexpected expression type!" << std::endl;

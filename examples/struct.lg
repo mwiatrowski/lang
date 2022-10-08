@@ -19,3 +19,10 @@ int_pair_pair := struct {
     first: int_pair,
     second: int_pair
 }
+
+pp : int_pair_pair
+pp.first.first := 1
+pp.second.first := 3
+pp.first.second := 2
+pp.second.second := 4
+println(pp.first.first, pp.first.second, pp.second.first, pp.second.second)

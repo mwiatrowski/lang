@@ -62,6 +62,11 @@ std::string printExpression(const AstNodeExpr &expr, const FuncDefs &functions) 
         out << printStatement(funcDef.functionBody, functions) << "\n";
         out << "END";
         return out.str();
+    } else if (is<AstNodeMemberAccess>(expr)) {
+        auto const &memAcc = as<AstNodeMemberAccess>(expr);
+        assert(memAcc.object.size() == 1);
+        return "(FROM " + printExpression(memAcc.object.front(), functions) + " GET " +
+               std::string{memAcc.member.name} + ")";
     }
 
     std::cerr << "Unexpected expression type! Index: " << expr.index() << std::endl;

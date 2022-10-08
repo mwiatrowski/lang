@@ -322,13 +322,14 @@ std::optional<AstNodeFuncCall> consumeFunctionCall(ParserContext &ctx) {
     return {};
 }
 
-std::optional<AstNodeExpr> consumeBasicExpression(ParserContext &ctx) {
+std::optional<AstNodeExpr> consumeAtomExpression(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
 
     if (peek<TokenLBrace>(tokens)) {
         return consumeParenthesizedExpression(ctx);
     }
 
+    // TODO: Function call should be a postfix operator.
     if (peek<TokenIdentifier, TokenLBrace>(tokens)) {
         auto funcCall = consumeFunctionCall(ctx);
         return funcCall.has_value() ? std::optional<AstNodeExpr>{*funcCall} : std::optional<AstNodeExpr>{};
@@ -358,30 +359,56 @@ std::optional<AstNodeExpr> consumeBasicExpression(ParserContext &ctx) {
         return AstNodeExpr{AstNodeBoolLiteral{.value = *tokenLiteral}};
     }
 
-    if (peek<TokenMinus>(tokens)) {
-        std::tie(std::ignore, tokens) = consume<TokenMinus>(tokens);
-        auto expr = consumeExpression(ctx);
-
-        if (!expr) {
-            std::cerr << "Expected an expression after a unary minus" << std::endl;
-            return {};
-        }
-
-        return AstNodeExpr{AstNodeNegation{.operands = {*expr}}};
-    }
-
+    // TODO: Function definitions should be handled more like structs.
     if (peek<TokenKwFn>(tokens)) {
         auto funcDef = consumeFunctionDefinition(ctx);
         return funcDef.has_value() ? std::optional<AstNodeExpr>{*funcDef} : std::optional<AstNodeExpr>{};
     }
 
-    std::cerr << "Failed to parse any expression" << std::endl;
     return {};
 }
 
+std::optional<AstNodeExpr> consumeBasicExpression(ParserContext &ctx) {
+    auto &tokens = ctx.tokens;
+
+    if (peek<TokenMinus>(tokens)) {
+        assert(consumeToken<TokenMinus>(ctx));
+        auto expr = consumeBasicExpression(ctx);
+        if (!expr) {
+            std::cerr << "Expected an expression after a unary minus" << std::endl;
+            return {};
+        }
+        return AstNodeExpr{AstNodeNegation{.operands = {*expr}}};
+    }
+
+    auto resultExpr = consumeAtomExpression(ctx);
+    if (!resultExpr) {
+        std::cerr << "Failed to parse an expression." << std::endl;
+        return {};
+    }
+
+    while (true) {
+        if (peek<TokenDot, TokenIdentifier>(tokens)) {
+            assert(consumeToken<TokenDot>(ctx));
+            auto memberName = consumeToken<TokenIdentifier>(ctx);
+            assert(memberName);
+
+            auto memAcc = AstNodeMemberAccess{.object = {std::move(*resultExpr)}, .member = std::move(*memberName)};
+            resultExpr = AstNodeExpr{std::move(memAcc)};
+
+            continue;
+        }
+
+        break;
+    }
+
+    assert(resultExpr);
+    return resultExpr;
+}
+
 std::optional<Token> consumeBinaryOperator(ParserContext &ctx) {
-    return consumeTokenAnyOf<TokenDot, TokenPlus, TokenMinus, TokenLess, TokenLessOrEqual, TokenGreater,
-                             TokenGreaterOrEqual, TokenEqual, TokenNotEqual>(ctx);
+    return consumeTokenAnyOf<TokenPlus, TokenMinus, TokenLess, TokenLessOrEqual, TokenGreater, TokenGreaterOrEqual,
+                             TokenEqual, TokenNotEqual>(ctx);
 }
 
 std::optional<AstNodeExpr> consumeExpression(ParserContext &ctx) {

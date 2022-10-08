@@ -43,8 +43,14 @@ struct AstNodeFuncRef {
     std::string generatedName;
 };
 
-struct AstNodeExpr : public std::variant<AstNodeIntLiteral, AstNodeStringLiteral, AstNodeBoolLiteral, AstNodeIdentifier,
-                                         AstNodeFuncCall, AstNodeBinaryOp, AstNodeNegation, AstNodeFuncRef> {};
+struct AstNodeMemberAccess {
+    std::vector<AstNodeExpr> object; // size 1
+    TokenIdentifier member;
+};
+
+struct AstNodeExpr
+    : public std::variant<AstNodeIntLiteral, AstNodeStringLiteral, AstNodeBoolLiteral, AstNodeIdentifier,
+                          AstNodeFuncCall, AstNodeBinaryOp, AstNodeNegation, AstNodeFuncRef, AstNodeMemberAccess> {};
 
 struct TypedVariable {
     TokenIdentifier varName;

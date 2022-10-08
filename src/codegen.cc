@@ -147,10 +147,6 @@ std::string generateFuncCallStr(std::ostream &output, const AstNodeFuncCall &fun
 }
 
 char const *getBinaryOperationStr(Token const &op) {
-    if (is<TokenDot>(op)) {
-        return ".";
-    }
-
     if (to<TokenPlus>(op)) {
         return "+";
     }
@@ -213,16 +209,6 @@ std::string writeTemporaryAssignment(std::ostream &output, const AstNodeExpr &ex
     if (auto const binaryOp = to<AstNodeBinaryOp>(expr)) {
         assert(binaryOp->operands.size() == 2);
         auto lhs = writeTemporaryAssignment(output, binaryOp->operands[0], isRef);
-
-        if (is<TokenDot>(binaryOp->op)) {
-            if (!is<AstNodeIdentifier>(binaryOp->operands[1])) {
-                std::cerr << "Expected a member name." << std::endl;
-                return writeDecl("nullptr");
-            }
-            auto mName = as<AstNodeIdentifier>(binaryOp->operands[1]).value.name;
-            return writeDecl(lhs + "." + std::string{mName});
-        }
-
         auto rhs = writeTemporaryAssignment(output, binaryOp->operands[1], isRef);
         auto const *op = getBinaryOperationStr(binaryOp->op);
         return writeDecl(lhs + " " + op + " " + rhs);
@@ -236,6 +222,15 @@ std::string writeTemporaryAssignment(std::ostream &output, const AstNodeExpr &ex
 
     if (const auto funcDef = to<AstNodeFuncRef>(expr)) {
         return writeDecl(funcDef->generatedName);
+    }
+
+    if (is<AstNodeMemberAccess>(expr)) {
+        auto const &memAcc = as<AstNodeMemberAccess>(expr);
+        assert(memAcc.object.size() == 1);
+
+        auto obj = writeTemporaryAssignment(output, memAcc.object.front(), isRef);
+        auto mName = std::string{memAcc.member.name};
+        return writeDecl(obj + "." + mName);
     }
 
     std::cerr << "Unexpected expression type: " << expr.index() << std::endl;
