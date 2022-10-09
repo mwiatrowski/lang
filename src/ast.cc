@@ -34,16 +34,11 @@ std::string printExpression(const AstNodeExpr &expr, const FuncDefs &functions) 
         stream << ")";
         return stream.str();
     } else if (auto binaryOp = to<AstNodeBinaryOp>(expr)) {
-        assert(binaryOp->operands.size() == 2);
-        auto const &lhs = binaryOp->operands[0];
-        auto const &rhs = binaryOp->operands[1];
-        return "(" + printExpression(lhs, functions) + " " + printToken(binaryOp->op) + " " +
-               printExpression(rhs, functions) + ")";
+        return "(" + printExpression(*binaryOp->lhs, functions) + " " + printToken(binaryOp->op) + " " +
+               printExpression(*binaryOp->rhs, functions) + ")";
     } else if (std::holds_alternative<AstNodeNegation>(expr)) {
         auto negation = std::get<AstNodeNegation>(expr);
-        const auto &operands = negation.operands;
-        assert(operands.size() == 1);
-        return "( - " + printExpression(operands[0], functions) + ")";
+        return "( - " + printExpression(*negation.operand, functions) + ")";
     } else if (const auto funcRef = to<AstNodeFuncRef>(expr)) {
         auto it = functions.find(funcRef->generatedName);
         assert(it != functions.end());
@@ -64,9 +59,7 @@ std::string printExpression(const AstNodeExpr &expr, const FuncDefs &functions) 
         return out.str();
     } else if (is<AstNodeMemberAccess>(expr)) {
         auto const &memAcc = as<AstNodeMemberAccess>(expr);
-        assert(memAcc.object.size() == 1);
-        return "(FROM " + printExpression(memAcc.object.front(), functions) + " GET " +
-               std::string{memAcc.member.name} + ")";
+        return "(FROM " + printExpression(*memAcc.object, functions) + " GET " + std::string{memAcc.member.name} + ")";
     }
 
     std::cerr << "Unexpected expression type! Index: " << expr.index() << std::endl;
@@ -115,7 +108,6 @@ std::string printStatement(const AstNodeStmt &stmt, const FuncDefs &functions) {
 
     if (is<AstNodeIfBlock>(stmt)) {
         auto const &ifBlock = as<AstNodeIfBlock>(stmt);
-        assert(ifBlock.brIfElif.size() >= 1);
 
         auto out = std::stringstream{};
 
@@ -126,9 +118,8 @@ std::string printStatement(const AstNodeStmt &stmt, const FuncDefs &functions) {
             isFirst = false;
         }
 
-        if (!ifBlock.brElse.empty()) {
-            assert(ifBlock.brElse.size() == 1);
-            auto const &elseBody = ifBlock.brElse.front();
+        if (ifBlock.brElse.hasValue()) {
+            auto const &elseBody = *ifBlock.brElse;
             out << "ELSE {\n" << printStatement(elseBody, functions) << "\n}\n";
         }
 
@@ -137,10 +128,8 @@ std::string printStatement(const AstNodeStmt &stmt, const FuncDefs &functions) {
 
     if (is<AstNodeWhileLoop>(stmt)) {
         auto const &loop = as<AstNodeWhileLoop>(stmt);
-        assert(loop.body.size() == 1);
-
         return "WHILE (" + printExpression(loop.condition, functions) + ") {\n" +
-               printStatement(loop.body.front(), functions) + "\n}";
+               printStatement(*loop.body, functions) + "\n}";
     }
 
     if (is<AstNodeBreakStmt>(stmt)) {

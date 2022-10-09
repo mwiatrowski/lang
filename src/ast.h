@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "tokens.h"
+#include "value_ptr.h"
 
 struct AstNodeExpr;
 struct AstNodeStmt;
@@ -32,11 +33,12 @@ struct AstNodeFuncCall {
 
 struct AstNodeBinaryOp {
     Token op;
-    std::vector<AstNodeExpr> operands; // size 2
+    ValuePtr<AstNodeExpr> lhs;
+    ValuePtr<AstNodeExpr> rhs;
 };
 
 struct AstNodeNegation {
-    std::vector<AstNodeExpr> operands; // size 1
+    ValuePtr<AstNodeExpr> operand;
 };
 
 struct AstNodeFuncRef {
@@ -44,7 +46,7 @@ struct AstNodeFuncRef {
 };
 
 struct AstNodeMemberAccess {
-    std::vector<AstNodeExpr> object; // size 1
+    ValuePtr<AstNodeExpr> object;
     TokenIdentifier member;
 };
 
@@ -84,12 +86,12 @@ struct AstNodeScope {
 struct Branch;
 struct AstNodeIfBlock {
     std::vector<Branch> brIfElif;
-    std::vector<AstNodeStmt> brElse; // size 0 or 1
+    ValuePtr<AstNodeStmt> brElse;
 };
 
 struct AstNodeWhileLoop {
     AstNodeExpr condition;
-    std::vector<AstNodeStmt> body; // size 1
+    ValuePtr<AstNodeStmt> body;
 };
 
 struct AstNodeBreakStmt {};

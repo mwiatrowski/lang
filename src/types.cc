@@ -155,8 +155,8 @@ std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, VarTypes co
     }
 
     if (auto const binaryOp = to<AstNodeBinaryOp>(expr)) {
-        auto const &lhs = binaryOp->operands[0];
-        auto const &rhs = binaryOp->operands[1];
+        auto const &lhs = *binaryOp->lhs;
+        auto const &rhs = *binaryOp->rhs;
 
         const auto lhsType = getExpressionType(lhs, varTypes, typeDefs, funcDefs);
         if (!lhsType) {
@@ -175,7 +175,7 @@ std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, VarTypes co
 
     if (std::holds_alternative<AstNodeNegation>(expr)) {
         const auto &negation = std::get<AstNodeNegation>(expr);
-        const auto type = getExpressionType(negation.operands[0], varTypes, typeDefs, funcDefs);
+        const auto type = getExpressionType(*negation.operand, varTypes, typeDefs, funcDefs);
         if (!type || !std::holds_alternative<type::I64>(*type)) {
             std::cerr << "Type of the expression is not integer." << std::endl;
             return {};
@@ -213,9 +213,8 @@ std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, VarTypes co
 
     if (is<AstNodeMemberAccess>(expr)) {
         auto const &memAcc = as<AstNodeMemberAccess>(expr);
-        assert(memAcc.object.size() == 1);
 
-        auto objType = getExpressionType(memAcc.object.front(), varTypes, typeDefs, funcDefs);
+        auto objType = getExpressionType(*memAcc.object, varTypes, typeDefs, funcDefs);
         if (!objType) {
             std::cerr << "Couldn't determine the type of the object." << std::endl;
             return {};

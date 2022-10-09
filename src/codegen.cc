@@ -207,16 +207,14 @@ std::string writeTemporaryAssignment(std::ostream &output, const AstNodeExpr &ex
     }
 
     if (auto const binaryOp = to<AstNodeBinaryOp>(expr)) {
-        assert(binaryOp->operands.size() == 2);
-        auto lhs = writeTemporaryAssignment(output, binaryOp->operands[0], isRef);
-        auto rhs = writeTemporaryAssignment(output, binaryOp->operands[1], isRef);
+        auto lhs = writeTemporaryAssignment(output, *binaryOp->lhs, isRef);
+        auto rhs = writeTemporaryAssignment(output, *binaryOp->rhs, isRef);
         auto const *op = getBinaryOperationStr(binaryOp->op);
         return writeDecl(lhs + " " + op + " " + rhs);
     }
 
     if (const auto negation = to<AstNodeNegation>(expr)) {
-        assert(negation->operands.size() == 1);
-        auto rhs = writeTemporaryAssignment(output, negation->operands[0], isRef);
+        auto rhs = writeTemporaryAssignment(output, *negation->operand, isRef);
         return writeDecl("-" + rhs);
     }
 
@@ -226,9 +224,7 @@ std::string writeTemporaryAssignment(std::ostream &output, const AstNodeExpr &ex
 
     if (is<AstNodeMemberAccess>(expr)) {
         auto const &memAcc = as<AstNodeMemberAccess>(expr);
-        assert(memAcc.object.size() == 1);
-
-        auto obj = writeTemporaryAssignment(output, memAcc.object.front(), isRef);
+        auto obj = writeTemporaryAssignment(output, *memAcc.object, isRef);
         auto mName = std::string{memAcc.member.name};
         return writeDecl(obj + "." + mName);
     }
@@ -287,7 +283,6 @@ void writeScope(std::ostream &output, DeclaredVars &declared, AstNodeScope const
 
 void writeIfElifElse(std::ostream &output, DeclaredVars &declared, AstNodeIfBlock const &ifElifElse) {
     assert(ifElifElse.brIfElif.size() >= 1);
-    assert(ifElifElse.brElse.size() <= 1);
 
     auto declaredBefore = declared;
     auto nestingLevel = 0;
@@ -300,8 +295,8 @@ void writeIfElifElse(std::ostream &output, DeclaredVars &declared, AstNodeIfBloc
         nestingLevel += 1;
     }
 
-    if (ifElifElse.brElse.size() > 0) {
-        auto const &body = ifElifElse.brElse.front();
+    if (ifElifElse.brElse.hasValue()) {
+        auto const &body = *ifElifElse.brElse;
         writeStatement(output, declared, body);
     }
 
@@ -313,14 +308,12 @@ void writeIfElifElse(std::ostream &output, DeclaredVars &declared, AstNodeIfBloc
 }
 
 void writeWhileLoop(std::ostream &output, DeclaredVars &declared, AstNodeWhileLoop const &loop) {
-    assert(loop.body.size() == 1);
-
     auto declaredBefore = declared;
 
     output << "while (true) {\n";
     auto condVar = writeTemporaryAssignment(output, loop.condition, false);
     output << "if (!" << condVar << ") { break; }\n";
-    writeStatement(output, declared, loop.body.front());
+    writeStatement(output, declared, *loop.body);
     output << "}\n";
 
     declared = std::move(declaredBefore);

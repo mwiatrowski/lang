@@ -378,7 +378,7 @@ std::optional<AstNodeExpr> consumeBasicExpression(ParserContext &ctx) {
             std::cerr << "Expected an expression after a unary minus" << std::endl;
             return {};
         }
-        return AstNodeExpr{AstNodeNegation{.operands = {*expr}}};
+        return AstNodeExpr{AstNodeNegation{.operand = {std::move(*expr)}}};
     }
 
     auto resultExpr = consumeAtomExpression(ctx);
@@ -450,7 +450,7 @@ std::optional<AstNodeExpr> consumeExpression(ParserContext &ctx) {
         auto rhs = std::move(subExprs.at(i + 1));
         auto op = operators.at(i);
 
-        auto newLhs = AstNodeBinaryOp{.op = op, .operands = {std::move(lhs), std::move(rhs)}};
+        auto newLhs = AstNodeBinaryOp{.op = op, .lhs = {std::move(lhs)}, .rhs = {std::move(rhs)}};
         lhs = AstNodeExpr{std::move(newLhs)};
     }
     return lhs;
@@ -552,7 +552,7 @@ std::optional<AstNodeIfBlock> consumeIfElifElse(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
 
     auto brIfElif = std::vector<Branch>{};
-    auto brElse = std::vector<AstNodeStmt>{};
+    auto brElse = ValuePtr<AstNodeStmt>{};
 
     auto ifBranch = consumeIfElifBranch<TokenKwIf>(ctx);
     if (!ifBranch) {
@@ -576,7 +576,7 @@ std::optional<AstNodeIfBlock> consumeIfElifElse(ParserContext &ctx) {
             std::cerr << "Expected an 'else' branch." << std::endl;
             return {};
         }
-        brElse.push_back(std::move(*elseBranch));
+        brElse = {std::move(*elseBranch)};
     }
 
     return AstNodeIfBlock{.brIfElif = std::move(brIfElif), .brElse = std::move(brElse)};
