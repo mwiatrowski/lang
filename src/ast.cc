@@ -24,14 +24,14 @@ std::string printExpression(const AstNodeExpr &expr, const FuncDefs &functions) 
     } else if (std::holds_alternative<AstNodeIdentifier>(expr)) {
         auto identifier = std::get<AstNodeIdentifier>(expr);
         return "(IDENTIFIER " + std::string{identifier.value.name} + ")";
-    } else if (std::holds_alternative<AstNodeFuncCall>(expr)) {
-        auto funcCall = std::get<AstNodeFuncCall>(expr);
+    } else if (is<AstNodeFuncCall>(expr)) {
+        auto const &funcCall = as<AstNodeFuncCall>(expr);
         auto stream = std::stringstream{};
-        stream << "(CALL " << funcCall.functionName.name;
+        stream << "(CALL " << printExpression(*funcCall.object, functions) << " (";
         for (const auto &arg : funcCall.arguments) {
             stream << " " << printExpression(arg, functions);
         }
-        stream << ")";
+        stream << " ))";
         return stream.str();
     } else if (auto binaryOp = to<AstNodeBinaryOp>(expr)) {
         return "(" + printExpression(*binaryOp->lhs, functions) + " " + printToken(binaryOp->op) + " " +
@@ -67,9 +67,9 @@ std::string printExpression(const AstNodeExpr &expr, const FuncDefs &functions) 
 }
 
 std::string printStatement(const AstNodeStmt &stmt, const FuncDefs &functions) {
-    if (std::holds_alternative<AstNodeFuncCall>(stmt)) {
-        auto funcCall = std::get<AstNodeFuncCall>(stmt);
-        return printExpression(AstNodeExpr{funcCall}, functions);
+    if (is<AstNodeExpr>(stmt)) {
+        auto const &expr = as<AstNodeExpr>(stmt);
+        return printExpression(expr, functions);
     }
 
     if (is<AstNodeStructDecl>(stmt)) {

@@ -25,16 +25,20 @@ constexpr auto *STD_LIB_CONTENTS = R"STDLIB_RAWSTRING(
 #include <string>
 #include <tuple>
 
+struct __empty_t {};
+
 template<typename... Ts>
-void print(Ts&&... args) {
+__empty_t print(Ts&&... args) {
     auto output = std::stringstream{};
     ((output << std::forward<Ts>(args)), ...);
     std::cout << output.str() << std::flush;
+    return {};
 }
 
 template<typename... Ts>
-void println(Ts&&... args) {
+__empty_t println(Ts&&... args) {
     print(std::forward<Ts>(args) ..., '\n');
+    return {};
 }
 
 std::string input() {
@@ -71,7 +75,7 @@ std::string returnTypeToCppTypeName(std::vector<TypedVariable> const &returnType
     auto typesNum = std::ssize(returnTypes);
 
     if (typesNum == 0) {
-        return "void";
+        return "__empty_t";
     }
 
     if (typesNum == 1) {
@@ -104,7 +108,7 @@ void writeReturnStatement(std::ostream &output, std::vector<TypedVariable> const
     auto retValsNum = std::ssize(returnVals);
 
     if (retValsNum == 0) {
-        output << "return;" << std::endl;
+        output << "return {};" << std::endl;
         return;
     }
 
@@ -133,8 +137,14 @@ std::string generateFuncCallStr(std::ostream &output, const AstNodeFuncCall &fun
         args.emplace_back(writeTemporaryAssignment(output, argExpr, false));
     }
 
+    if (!is<AstNodeIdentifier>(*funcCall.object)) {
+        std::cerr << "Right now complex expressions can't be called." << std::endl;
+        return "INVALID";
+    }
+    auto const &funcName = as<AstNodeIdentifier>(*funcCall.object);
+
     auto funcCallStr = std::stringstream{};
-    funcCallStr << funcCall.functionName.name << "(";
+    funcCallStr << funcName.value.name << "(";
     for (size_t i = 0; i < args.size(); ++i) {
         if (i != 0) {
             funcCallStr << ", ";
@@ -231,11 +241,6 @@ std::string writeTemporaryAssignment(std::ostream &output, const AstNodeExpr &ex
 
     std::cerr << "Unexpected expression type: " << expr.index() << std::endl;
     assert(false);
-}
-
-void writeFunctionCall(std::ostream &output, const AstNodeFuncCall &funcCall) {
-    auto funcCallStr = generateFuncCallStr(output, funcCall);
-    output << "(void) " << funcCallStr << ";\n";
 }
 
 void writeDeclaration(std::ostream &output, DeclaredVars &declared, AstNodeDeclaration const &decl) {
@@ -336,8 +341,9 @@ void writeStatement(std::ostream &output, DeclaredVars &declared, const AstNodeS
         return;
     }
 
-    if (const auto &funcCall = to<AstNodeFuncCall>(stmt)) {
-        writeFunctionCall(output, *funcCall);
+    if (is<AstNodeExpr>(stmt)) {
+        auto const &expr = as<AstNodeExpr>(stmt);
+        writeTemporaryAssignment(output, expr, false);
         return;
     }
 

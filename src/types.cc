@@ -148,9 +148,8 @@ std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, VarTypes co
         return varTypes.at(name);
     }
 
-    if (std::holds_alternative<AstNodeFuncCall>(expr)) {
-        const auto &funcCall = std::get<AstNodeFuncCall>(expr);
-        std::cerr << "Cannot determine the return type of " << funcCall.functionName.name << std::endl;
+    if (is<AstNodeFuncCall>(expr)) {
+        std::cerr << "Can't determine the return type of a function yet." << std::endl;
         return {};
     }
 

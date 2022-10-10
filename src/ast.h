@@ -26,8 +26,9 @@ struct AstNodeBoolLiteral {
 struct AstNodeIdentifier {
     TokenIdentifier value;
 };
+
 struct AstNodeFuncCall {
-    TokenIdentifier functionName;
+    ValuePtr<AstNodeExpr> object;
     std::vector<AstNodeExpr> arguments;
 };
 
@@ -98,7 +99,7 @@ struct AstNodeBreakStmt {};
 struct AstNodeContinueStmt {};
 
 struct AstNodeStmt
-    : public std::variant<AstNodeStructDecl, AstNodeDeclaration, AstNodeVarAssignment, AstNodeFuncCall, AstNodeScope,
+    : public std::variant<AstNodeStructDecl, AstNodeDeclaration, AstNodeVarAssignment, AstNodeExpr, AstNodeScope,
                           AstNodeIfBlock, AstNodeWhileLoop, AstNodeBreakStmt, AstNodeContinueStmt> {};
 
 struct Branch {

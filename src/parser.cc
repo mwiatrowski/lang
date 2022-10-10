@@ -93,6 +93,35 @@ auto consumeDelimited(ParserContext &ctx, FnGetElem consumeElem, FnGetSep consum
     return result;
 }
 
+template <typename FnGetElem, typename FnGetSep>
+requires std::invocable<FnGetElem, ParserContext &> && std::invocable<FnGetSep, ParserContext &>
+auto consumeDelimitedNoTrailing(ParserContext &ctx, FnGetElem consumeElem, FnGetSep consumeSep)
+    -> std::vector<ConsumedType<FnGetElem>> {
+    using ElemType = ConsumedType<FnGetElem>;
+    auto result = std::vector<ElemType>{};
+
+    if (auto elem = consumeElem(ctx)) {
+        result.push_back(std::move(*elem));
+    } else {
+        return {};
+    }
+
+    while (true) {
+        if (!consumeSep(ctx)) {
+            break;
+        }
+
+        if (auto elem = consumeElem(ctx)) {
+            result.push_back(std::move(*elem));
+        } else {
+            std::cerr << "Trailing delimiter is not allowed." << std::endl;
+            break;
+        }
+    }
+
+    return result;
+}
+
 std::optional<AstNodeExpr> consumeParenthesizedExpression(ParserContext &ctx) {
     if (!consumeToken<TokenLBrace>(ctx)) {
         std::cerr << "Expected an opening brace." << std::endl;
@@ -267,59 +296,24 @@ std::optional<AstNodeScope> consumeScopedStmtList(ParserContext &ctx) {
     return AstNodeScope{.statements = std::move(stmts)};
 }
 
-std::optional<AstNodeFuncCall> consumeFunctionCall(ParserContext &ctx) {
+std::optional<std::vector<AstNodeExpr>> consumeFunctionCallArguments(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
 
-    if (!peek<TokenIdentifier, TokenLBrace>(tokens)) {
-        std::cerr << "Function call must start with the name of the function and an opening brace." << std::endl;
+    if (!peek<TokenLBrace>(tokens)) {
+        std::cerr << "Expected an opening brace." << std::endl;
         return {};
     }
+    assert(consumeToken<TokenLBrace>(ctx));
 
-    auto funcName = TokenIdentifier{};
-    std::tie(funcName, tokens) = consume<TokenIdentifier>(tokens);
-    std::tie(std::ignore, tokens) = consume<TokenLBrace>(tokens);
+    auto arguments = consumeDelimited(ctx, consumeExpression, consumeToken<TokenComma>);
 
-    if (peek<TokenRBrace>(tokens)) {
-        std::tie(std::ignore, tokens) = consume<TokenRBrace>(tokens);
-        return AstNodeFuncCall{.functionName = funcName, .arguments = {}};
-    }
-
-    auto args = std::vector<AstNodeExpr>{};
-
-    while (!tokens.empty()) {
-        auto expr = consumeExpression(ctx);
-
-        if (!expr.has_value()) {
-            std::cerr << "Expected an expression!" << std::endl;
-            tokens = consumeUntil<TokenRBrace>(tokens);
-            return {};
-        }
-        args.push_back(*expr);
-
-        if (tokens.empty()) {
-            std::cerr << "No more tokens left!" << std::endl;
-            return {};
-        }
-
-        if (peek<TokenComma>(tokens)) {
-            std::tie(std::ignore, tokens) = consume<TokenComma>(tokens);
-            continue;
-        }
-
-        if (peek<TokenRBrace>(tokens)) {
-            std::tie(std::ignore, tokens) = consume<TokenRBrace>(tokens);
-            return AstNodeFuncCall{.functionName = funcName, .arguments = std::move(args)};
-        }
-
-        assert(!tokens.empty());
-        std::cerr << "Expected either a comma or a closing brace, got " << printToken(tokens.front()) << std::endl;
-        tokens = consumeUntil<TokenRBrace>(tokens);
+    if (!peek<TokenRBrace>(tokens)) {
+        std::cerr << "Expected a closing brace." << std::endl;
         return {};
     }
+    assert(consumeToken<TokenRBrace>(ctx));
 
-    assert(tokens.empty());
-    std::cerr << "Expected more tokens!" << std::endl;
-    return {};
+    return {std::move(arguments)};
 }
 
 std::optional<AstNodeExpr> consumeAtomExpression(ParserContext &ctx) {
@@ -327,12 +321,6 @@ std::optional<AstNodeExpr> consumeAtomExpression(ParserContext &ctx) {
 
     if (peek<TokenLBrace>(tokens)) {
         return consumeParenthesizedExpression(ctx);
-    }
-
-    // TODO: Function call should be a postfix operator.
-    if (peek<TokenIdentifier, TokenLBrace>(tokens)) {
-        auto funcCall = consumeFunctionCall(ctx);
-        return funcCall.has_value() ? std::optional<AstNodeExpr>{*funcCall} : std::optional<AstNodeExpr>{};
     }
 
     if (peek<TokenIdentifier>(tokens)) {
@@ -395,6 +383,19 @@ std::optional<AstNodeExpr> consumeBasicExpression(ParserContext &ctx) {
 
             auto memAcc = AstNodeMemberAccess{.object = {std::move(*resultExpr)}, .member = std::move(*memberName)};
             resultExpr = AstNodeExpr{std::move(memAcc)};
+
+            continue;
+        }
+
+        if (peek<TokenLBrace>(tokens)) {
+            auto args = consumeFunctionCallArguments(ctx);
+            if (!args) {
+                std::cerr << "Expected a list of arguments for the function call." << std::endl;
+                return {};
+            }
+
+            auto funcCall = AstNodeFuncCall{.object = {std::move(*resultExpr)}, .arguments = std::move(*args)};
+            resultExpr = AstNodeExpr{std::move(funcCall)};
 
             continue;
         }
@@ -465,7 +466,7 @@ std::optional<AstNodeStmt> consumeDeclaration(ParserContext &ctx) {
     return AstNodeStmt{AstNodeDeclaration{.variable = std::move(tVar->varName), .type = std::move(tVar->varType)}};
 }
 
-std::optional<AstNodeStmt> consumeAssignment(ParserContext &ctx) {
+std::optional<AstNodeStmt> consumeAssignmentOrExpression(ParserContext &ctx) {
     auto lhs = consumeExpression(ctx);
     if (!lhs) {
         std::cerr << "Expected an assignment left-hand side." << std::endl;
@@ -473,8 +474,7 @@ std::optional<AstNodeStmt> consumeAssignment(ParserContext &ctx) {
     }
 
     if (!consumeToken<TokenAssignment>(ctx)) {
-        std::cerr << "Expected an assignment operator." << std::endl;
-        return {};
+        return AstNodeStmt{std::move(*lhs)};
     }
 
     auto rhs = consumeExpression(ctx);
@@ -610,14 +610,6 @@ std::optional<AstNodeStmt> consumeStatement(ParserContext &ctx) {
         return consumeDeclaration(ctx);
     }
 
-    if (peek<TokenIdentifier, TokenLBrace>(tokens)) {
-        auto funcCall = consumeFunctionCall(ctx);
-        if (!funcCall) {
-            return {};
-        }
-        return AstNodeStmt{*funcCall};
-    }
-
     if (peek<TokenLCurBrace>(tokens)) {
         auto scope = consumeScopedStmtList(ctx);
         if (!scope) {
@@ -650,7 +642,7 @@ std::optional<AstNodeStmt> consumeStatement(ParserContext &ctx) {
         return consumeStructDeclaration(ctx);
     }
 
-    return consumeAssignment(ctx);
+    return consumeAssignmentOrExpression(ctx);
 }
 
 StmtList consumeStmtList(ParserContext &ctx) {
