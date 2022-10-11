@@ -1,9 +1,9 @@
 #pragma once
 
-#include <unordered_map>
+#include <string>
+#include <string_view>
 #include <variant>
-
-#include "parser.h"
+#include <vector>
 
 namespace type {
 
@@ -47,8 +47,3 @@ struct Member {
 } // namespace type
 
 std::string printType(const type::Type &type);
-
-using VarTypes = std::unordered_map<std::string_view, type::Type>;
-using TypeDefs = std::unordered_map<std::string, type::Type>;
-
-VarTypes resolveTypes(const ParserOutput &parserOutput);

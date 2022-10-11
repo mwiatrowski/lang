@@ -8,7 +8,7 @@
 #include "lexer.h"
 #include "parser.h"
 #include "strings.h"
-#include "types.h"
+#include "typecheck.h"
 
 namespace {
 
