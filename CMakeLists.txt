@@ -22,6 +22,7 @@ add_executable(${COMPILER_EXECUTABLE}
     src/parser.cc
     src/strings.cc
     src/tokens.cc
+    src/translation.cc
     src/typecheck.cc
     src/types.cc
 )

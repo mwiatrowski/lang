@@ -2,6 +2,6 @@
 
 #include <string>
 
-#include "parser.h"
+#include "ir.h"
 
-std::string generateCode(const ParserOutput &parserOutput);
+std::string generateCode(ProgramIr const &ir);

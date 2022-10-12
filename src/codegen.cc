@@ -3,6 +3,7 @@
 #include <cassert>
 #include <iostream>
 #include <ranges>
+#include <span>
 #include <sstream>
 #include <string>
 #include <unordered_set>
@@ -71,7 +72,7 @@ std::string typeNameToCppTypeName(TokenIdentifier typeName) {
     return std::string{name};
 }
 
-std::string returnTypeToCppTypeName(std::vector<ast::TypedVariable> const &returnTypes) {
+std::string returnTypeToCppTypeName(std::vector<ir::TypedVariable> const &returnTypes) {
     auto typesNum = std::ssize(returnTypes);
 
     if (typesNum == 0) {
@@ -97,14 +98,14 @@ std::string returnTypeToCppTypeName(std::vector<ast::TypedVariable> const &retur
 }
 
 void writeRetValDeclaration(std::ostream &output, DeclaredVars &declared,
-                            std::vector<ast::TypedVariable> const &returnVals) {
+                            std::vector<ir::TypedVariable> const &returnVals) {
     for (auto const &[retName, retType] : returnVals) {
         output << "auto " << retName.name << " = " << typeNameToCppTypeName(retType) << "{};\n";
         declared.insert(std::string{retName.name});
     }
 }
 
-void writeReturnStatement(std::ostream &output, std::vector<ast::TypedVariable> const &returnVals) {
+void writeReturnStatement(std::ostream &output, std::vector<ir::TypedVariable> const &returnVals) {
     auto retValsNum = std::ssize(returnVals);
 
     if (retValsNum == 0) {
@@ -129,19 +130,19 @@ void writeReturnStatement(std::ostream &output, std::vector<ast::TypedVariable> 
     output << ");" << std::endl;
 }
 
-std::string writeTemporaryAssignment(std::ostream &output, const ast::Expr &expr, bool isRef);
+std::string writeTemporaryAssignment(std::ostream &output, const ir::Expr &expr, bool isRef);
 
-std::string generateFuncCallStr(std::ostream &output, const ast::FuncCall &funcCall) {
+std::string generateFuncCallStr(std::ostream &output, const ir::FuncCall &funcCall) {
     auto args = std::vector<std::string>{};
     for (const auto &argExpr : funcCall.arguments) {
         args.emplace_back(writeTemporaryAssignment(output, argExpr, false));
     }
 
-    if (!is<ast::Identifier>(*funcCall.object)) {
+    if (!is<ir::Identifier>(*funcCall.object)) {
         std::cerr << "Right now complex expressions can't be called." << std::endl;
         return "INVALID";
     }
-    auto const &funcName = as<ast::Identifier>(*funcCall.object);
+    auto const &funcName = as<ir::Identifier>(*funcCall.object);
 
     auto funcCallStr = std::stringstream{};
     funcCallStr << funcName.value.name << "(";
@@ -186,54 +187,54 @@ char const *getBinaryOperationStr(Token const &op) {
     assert(false);
 }
 
-std::string writeTemporaryAssignment(std::ostream &output, const ast::Expr &expr, bool isRef) {
+std::string writeTemporaryAssignment(std::ostream &output, const ir::Expr &expr, bool isRef) {
     auto writeDecl = [&output, &isRef](const auto &value) -> std::string {
         auto name = getTmpVarName();
         output << (isRef ? "auto &" : "auto ") << name << " = " << value << ";\n";
         return name;
     };
 
-    if (const auto literal = to<ast::IntLiteral>(expr)) {
+    if (const auto literal = to<ir::IntLiteral>(expr)) {
         return writeDecl(literal->value.value);
     }
 
-    if (const auto literal = to<ast::StringLiteral>(expr)) {
+    if (const auto literal = to<ir::StringLiteral>(expr)) {
         auto escapedStr = "R\"IMPL_STR_LITERAL(" + std::string{literal->value.value} + ")IMPL_STR_LITERAL\"";
         return writeDecl(escapedStr);
     }
 
-    if (is<ast::BoolLiteral>(expr)) {
-        auto const &literal = as<ast::BoolLiteral>(expr);
+    if (is<ir::BoolLiteral>(expr)) {
+        auto const &literal = as<ir::BoolLiteral>(expr);
         return writeDecl(literal.value.value ? "true" : "false");
     }
 
-    if (const auto identifier = to<ast::Identifier>(expr)) {
+    if (const auto identifier = to<ir::Identifier>(expr)) {
         return writeDecl(identifier->value.name);
     }
 
-    if (const auto funcCall = to<ast::FuncCall>(expr)) {
+    if (const auto funcCall = to<ir::FuncCall>(expr)) {
         auto funcCallStr = generateFuncCallStr(output, *funcCall);
         return writeDecl(funcCallStr);
     }
 
-    if (auto const binaryOp = to<ast::BinaryOp>(expr)) {
+    if (auto const binaryOp = to<ir::BinaryOp>(expr)) {
         auto lhs = writeTemporaryAssignment(output, *binaryOp->lhs, isRef);
         auto rhs = writeTemporaryAssignment(output, *binaryOp->rhs, isRef);
         auto const *op = getBinaryOperationStr(binaryOp->op);
         return writeDecl(lhs + " " + op + " " + rhs);
     }
 
-    if (const auto negation = to<ast::Negation>(expr)) {
+    if (const auto negation = to<ir::Negation>(expr)) {
         auto rhs = writeTemporaryAssignment(output, *negation->operand, isRef);
         return writeDecl("-" + rhs);
     }
 
-    if (const auto funcDef = to<ast::FuncRef>(expr)) {
+    if (const auto funcDef = to<ir::FuncRef>(expr)) {
         return writeDecl(funcDef->generatedName);
     }
 
-    if (is<ast::MemberAccess>(expr)) {
-        auto const &memAcc = as<ast::MemberAccess>(expr);
+    if (is<ir::MemberAccess>(expr)) {
+        auto const &memAcc = as<ir::MemberAccess>(expr);
         auto obj = writeTemporaryAssignment(output, *memAcc.object, isRef);
         auto mName = std::string{memAcc.member.name};
         return writeDecl(obj + "." + mName);
@@ -243,7 +244,7 @@ std::string writeTemporaryAssignment(std::ostream &output, const ast::Expr &expr
     assert(false);
 }
 
-void writeDeclaration(std::ostream &output, DeclaredVars &declared, ast::Declaration const &decl) {
+void writeDeclaration(std::ostream &output, DeclaredVars &declared, ir::Declaration const &decl) {
     auto const varName = std::string{decl.variable.name};
     if (declared.contains(varName)) {
         std::cerr << "Cannot forward-declare an already declared variable." << std::endl;
@@ -254,12 +255,12 @@ void writeDeclaration(std::ostream &output, DeclaredVars &declared, ast::Declara
     declared.insert(varName);
 }
 
-void writeAssignment(std::ostream &output, DeclaredVars &declared, const ast::VarAssignment &assignment) {
+void writeAssignment(std::ostream &output, DeclaredVars &declared, const ir::VarAssignment &assignment) {
     auto lhs = std::string{};
     bool declareNewVar = false;
 
-    if (is<ast::Identifier>(assignment.lhs)) {
-        auto varName = std::string{as<ast::Identifier>(assignment.lhs).value.name};
+    if (is<ir::Identifier>(assignment.lhs)) {
+        auto varName = std::string{as<ir::Identifier>(assignment.lhs).value.name};
         if (!declared.contains(varName)) {
             lhs = varName;
             declareNewVar = true;
@@ -275,10 +276,10 @@ void writeAssignment(std::ostream &output, DeclaredVars &declared, const ast::Va
     output << (declareNewVar ? "auto " : "") << lhs << " = " << rhs << ";\n";
 }
 
-void writeStatementList(std::ostream &output, DeclaredVars &declared, const ast::StmtList &stmts);
-void writeStatement(std::ostream &output, DeclaredVars &declared, const ast::Stmt &stmt);
+void writeStatementList(std::ostream &output, DeclaredVars &declared, const ir::StmtList &stmts);
+void writeStatement(std::ostream &output, DeclaredVars &declared, const ir::Stmt &stmt);
 
-void writeScope(std::ostream &output, DeclaredVars &declared, ast::Scope const &scope) {
+void writeScope(std::ostream &output, DeclaredVars &declared, ir::Scope const &scope) {
     auto declaredBefore = declared;
     output << "{\n";
     writeStatementList(output, declared, scope.statements);
@@ -286,7 +287,7 @@ void writeScope(std::ostream &output, DeclaredVars &declared, ast::Scope const &
     declared = std::move(declaredBefore);
 }
 
-void writeIfElifElse(std::ostream &output, DeclaredVars &declared, ast::IfBlock const &ifElifElse) {
+void writeIfElifElse(std::ostream &output, DeclaredVars &declared, ir::IfBlock const &ifElifElse) {
     assert(ifElifElse.brIfElif.size() >= 1);
 
     auto declaredBefore = declared;
@@ -312,7 +313,7 @@ void writeIfElifElse(std::ostream &output, DeclaredVars &declared, ast::IfBlock 
     declared = std::move(declaredBefore);
 }
 
-void writeWhileLoop(std::ostream &output, DeclaredVars &declared, ast::WhileLoop const &loop) {
+void writeWhileLoop(std::ostream &output, DeclaredVars &declared, ir::WhileLoop const &loop) {
     auto declaredBefore = declared;
 
     output << "while (true) {\n";
@@ -324,52 +325,52 @@ void writeWhileLoop(std::ostream &output, DeclaredVars &declared, ast::WhileLoop
     declared = std::move(declaredBefore);
 }
 
-void writeStatement(std::ostream &output, DeclaredVars &declared, const ast::Stmt &stmt) {
-    if (is<ast::StructDecl>(stmt)) {
+void writeStatement(std::ostream &output, DeclaredVars &declared, const ir::Stmt &stmt) {
+    if (is<ir::StructDecl>(stmt)) {
         // Handled elsewhere.
         return;
     }
 
-    if (is<ast::Declaration>(stmt)) {
-        auto const &decl = as<ast::Declaration>(stmt);
+    if (is<ir::Declaration>(stmt)) {
+        auto const &decl = as<ir::Declaration>(stmt);
         writeDeclaration(output, declared, decl);
         return;
     }
 
-    if (const auto &assignment = to<ast::VarAssignment>(stmt)) {
+    if (const auto &assignment = to<ir::VarAssignment>(stmt)) {
         writeAssignment(output, declared, *assignment);
         return;
     }
 
-    if (is<ast::Expr>(stmt)) {
-        auto const &expr = as<ast::Expr>(stmt);
+    if (is<ir::Expr>(stmt)) {
+        auto const &expr = as<ir::Expr>(stmt);
         writeTemporaryAssignment(output, expr, false);
         return;
     }
 
-    if (auto const &scope = to<ast::Scope>(stmt)) {
+    if (auto const &scope = to<ir::Scope>(stmt)) {
         writeScope(output, declared, *scope);
         return;
     }
 
-    if (is<ast::IfBlock>(stmt)) {
-        auto const &ifElifElse = as<ast::IfBlock>(stmt);
+    if (is<ir::IfBlock>(stmt)) {
+        auto const &ifElifElse = as<ir::IfBlock>(stmt);
         writeIfElifElse(output, declared, ifElifElse);
         return;
     }
 
-    if (is<ast::WhileLoop>(stmt)) {
-        auto const &loop = as<ast::WhileLoop>(stmt);
+    if (is<ir::WhileLoop>(stmt)) {
+        auto const &loop = as<ir::WhileLoop>(stmt);
         writeWhileLoop(output, declared, loop);
         return;
     }
 
-    if (is<ast::BreakStmt>(stmt)) {
+    if (is<ir::BreakStmt>(stmt)) {
         output << "break;\n";
         return;
     }
 
-    if (is<ast::ContinueStmt>(stmt)) {
+    if (is<ir::ContinueStmt>(stmt)) {
         output << "continue;\n";
         return;
     }
@@ -378,13 +379,13 @@ void writeStatement(std::ostream &output, DeclaredVars &declared, const ast::Stm
     assert(false);
 }
 
-void writeStatementList(std::ostream &output, DeclaredVars &declared, const ast::StmtList &stmts) {
+void writeStatementList(std::ostream &output, DeclaredVars &declared, const ir::StmtList &stmts) {
     for (const auto &stmt : stmts) {
         writeStatement(output, declared, stmt);
     }
 }
 
-void writeFunctionHeader(std::ostream &output, const std::string &name, const ast::FunctionDefinition &func) {
+void writeFunctionHeader(std::ostream &output, const std::string &name, const ir::FunctionDefinition &func) {
     output << returnTypeToCppTypeName(func.returnVals) << " " << name << "(";
     for (auto i = 0; i < ssize(func.arguments); ++i) {
         if (i > 0) {
@@ -396,12 +397,12 @@ void writeFunctionHeader(std::ostream &output, const std::string &name, const as
     output << ")";
 }
 
-void writeFunctionDeclaration(std::ostream &output, const std::string &name, const ast::FunctionDefinition &func) {
+void writeFunctionDeclaration(std::ostream &output, const std::string &name, const ir::FunctionDefinition &func) {
     writeFunctionHeader(output, name, func);
     output << ";" << std::endl;
 }
 
-void writeFunctionDefinition(std::ostream &output, const std::string &name, const ast::FunctionDefinition &func) {
+void writeFunctionDefinition(std::ostream &output, const std::string &name, const ir::FunctionDefinition &func) {
     writeFunctionHeader(output, name, func);
 
     auto declared = DeclaredVars{};
@@ -412,7 +413,7 @@ void writeFunctionDefinition(std::ostream &output, const std::string &name, cons
     output << "}" << std::endl;
 }
 
-void writeStruct(std::ostream &output, ast::StructDecl const &structDecl) {
+void writeStruct(std::ostream &output, ir::StructDecl const &structDecl) {
     auto const &name = structDecl.name.name;
     auto const &members = structDecl.definition.members;
 
@@ -423,17 +424,17 @@ void writeStruct(std::ostream &output, ast::StructDecl const &structDecl) {
     output << "};\n";
 }
 
-void writeUserStructs(std::ostream &output, ast::StmtList const &stmts) {
+void writeUserStructs(std::ostream &output, ir::StmtList const &stmts) {
     auto structs = std::span(stmts.begin(), stmts.end()) |
-                   std::views::filter([](auto const &stmt) { return is<ast::StructDecl>(stmt); }) |
-                   std::views::transform([](auto const &stmt) { return as<ast::StructDecl>(stmt); });
+                   std::views::filter([](auto const &stmt) { return is<ir::StructDecl>(stmt); }) |
+                   std::views::transform([](auto const &stmt) { return as<ir::StructDecl>(stmt); });
 
     for (auto const &structDecl : structs) {
         writeStruct(output, structDecl);
     }
 }
 
-void writeUserFunctions(std::ostream &output, const ast::FuncDefs &funcDefs) {
+void writeUserFunctions(std::ostream &output, const ir::FuncDefs &funcDefs) {
     (void)funcDefs;
 
     auto declarations = std::stringstream{};
@@ -448,7 +449,7 @@ void writeUserFunctions(std::ostream &output, const ast::FuncDefs &funcDefs) {
     output << definitions.str() << std::endl;
 }
 
-void writeMain(std::ostream &output, const ast::StmtList &ast) {
+void writeMain(std::ostream &output, const ir::StmtList &ast) {
     auto declared = DeclaredVars{};
     output << "int main() {\n";
     writeStatementList(output, declared, ast);
@@ -457,11 +458,11 @@ void writeMain(std::ostream &output, const ast::StmtList &ast) {
 
 } // namespace
 
-std::string generateCode(const ParserOutput &parserOutput) {
+std::string generateCode(ProgramIr const &ir) {
     auto output = std::stringstream{};
     writeStdLib(output);
-    writeUserStructs(output, parserOutput.ast);
-    writeUserFunctions(output, parserOutput.functions);
-    writeMain(output, parserOutput.ast);
+    writeUserStructs(output, ir.ast);
+    writeUserFunctions(output, ir.functions);
+    writeMain(output, ir.ast);
     return output.str();
 }

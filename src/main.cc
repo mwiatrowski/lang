@@ -8,6 +8,7 @@
 #include "lexer.h"
 #include "parser.h"
 #include "strings.h"
+#include "translation.h"
 #include "typecheck.h"
 
 namespace {
@@ -66,11 +67,13 @@ void startCompilation(CompilationOptions const &options) {
         std::cout << printAst(parserOutput) << std::endl;
     }
 
+    auto programIr = astToIr(parserOutput);
+
     auto typeInfo = resolveTypes(parserOutput);
     (void)typeInfo;
 
     auto outputStream = std::ofstream(options.outputFile, std::ios::out);
-    outputStream << generateCode(parserOutput);
+    outputStream << generateCode(programIr);
 }
 
 } // namespace
