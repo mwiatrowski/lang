@@ -9,23 +9,23 @@
 
 namespace {
 
-std::string printStatement(const AstNodeStmt &stmt, const FuncDefs &functions);
+std::string printStatement(const ast::Stmt &stmt, const ast::FuncDefs &functions);
 
-std::string printExpression(const AstNodeExpr &expr, const FuncDefs &functions) {
-    if (std::holds_alternative<AstNodeIntLiteral>(expr)) {
-        auto literal = std::get<AstNodeIntLiteral>(expr);
+std::string printExpression(const ast::Expr &expr, const ast::FuncDefs &functions) {
+    if (std::holds_alternative<ast::IntLiteral>(expr)) {
+        auto literal = std::get<ast::IntLiteral>(expr);
         return "(INT_LITERAL " + std::to_string(literal.value.value) + ")";
-    } else if (std::holds_alternative<AstNodeStringLiteral>(expr)) {
-        auto literal = std::get<AstNodeStringLiteral>(expr);
+    } else if (std::holds_alternative<ast::StringLiteral>(expr)) {
+        auto literal = std::get<ast::StringLiteral>(expr);
         return "(STRING_LITERAL " + std::string{literal.value.value} + ")";
-    } else if (is<AstNodeBoolLiteral>(expr)) {
-        auto const &literal = as<AstNodeBoolLiteral>(expr);
+    } else if (is<ast::BoolLiteral>(expr)) {
+        auto const &literal = as<ast::BoolLiteral>(expr);
         return "(BOOL_LITERAL " + std::string{literal.value.value ? "true" : "false"} + ")";
-    } else if (std::holds_alternative<AstNodeIdentifier>(expr)) {
-        auto identifier = std::get<AstNodeIdentifier>(expr);
+    } else if (std::holds_alternative<ast::Identifier>(expr)) {
+        auto identifier = std::get<ast::Identifier>(expr);
         return "(IDENTIFIER " + std::string{identifier.value.name} + ")";
-    } else if (is<AstNodeFuncCall>(expr)) {
-        auto const &funcCall = as<AstNodeFuncCall>(expr);
+    } else if (is<ast::FuncCall>(expr)) {
+        auto const &funcCall = as<ast::FuncCall>(expr);
         auto stream = std::stringstream{};
         stream << "(CALL " << printExpression(*funcCall.object, functions) << " (";
         for (const auto &arg : funcCall.arguments) {
@@ -33,13 +33,13 @@ std::string printExpression(const AstNodeExpr &expr, const FuncDefs &functions) 
         }
         stream << " ))";
         return stream.str();
-    } else if (auto binaryOp = to<AstNodeBinaryOp>(expr)) {
+    } else if (auto binaryOp = to<ast::BinaryOp>(expr)) {
         return "(" + printExpression(*binaryOp->lhs, functions) + " " + printToken(binaryOp->op) + " " +
                printExpression(*binaryOp->rhs, functions) + ")";
-    } else if (std::holds_alternative<AstNodeNegation>(expr)) {
-        auto negation = std::get<AstNodeNegation>(expr);
+    } else if (std::holds_alternative<ast::Negation>(expr)) {
+        auto negation = std::get<ast::Negation>(expr);
         return "( - " + printExpression(*negation.operand, functions) + ")";
-    } else if (const auto funcRef = to<AstNodeFuncRef>(expr)) {
+    } else if (const auto funcRef = to<ast::FuncRef>(expr)) {
         auto it = functions.find(funcRef->generatedName);
         assert(it != functions.end());
         const auto &funcDef = it->second;
@@ -57,8 +57,8 @@ std::string printExpression(const AstNodeExpr &expr, const FuncDefs &functions) 
         out << printStatement(funcDef.functionBody, functions) << "\n";
         out << "END";
         return out.str();
-    } else if (is<AstNodeMemberAccess>(expr)) {
-        auto const &memAcc = as<AstNodeMemberAccess>(expr);
+    } else if (is<ast::MemberAccess>(expr)) {
+        auto const &memAcc = as<ast::MemberAccess>(expr);
         return "(FROM " + printExpression(*memAcc.object, functions) + " GET " + std::string{memAcc.member.name} + ")";
     }
 
@@ -66,14 +66,14 @@ std::string printExpression(const AstNodeExpr &expr, const FuncDefs &functions) 
     assert(false);
 }
 
-std::string printStatement(const AstNodeStmt &stmt, const FuncDefs &functions) {
-    if (is<AstNodeExpr>(stmt)) {
-        auto const &expr = as<AstNodeExpr>(stmt);
+std::string printStatement(const ast::Stmt &stmt, const ast::FuncDefs &functions) {
+    if (is<ast::Expr>(stmt)) {
+        auto const &expr = as<ast::Expr>(stmt);
         return printExpression(expr, functions);
     }
 
-    if (is<AstNodeStructDecl>(stmt)) {
-        auto const &structDecl = to<AstNodeStructDecl>(stmt);
+    if (is<ast::StructDecl>(stmt)) {
+        auto const &structDecl = to<ast::StructDecl>(stmt);
 
         auto out = std::stringstream{};
 
@@ -86,17 +86,17 @@ std::string printStatement(const AstNodeStmt &stmt, const FuncDefs &functions) {
         return out.str();
     }
 
-    if (is<AstNodeDeclaration>(stmt)) {
-        auto const &decl = as<AstNodeDeclaration>(stmt);
+    if (is<ast::Declaration>(stmt)) {
+        auto const &decl = as<ast::Declaration>(stmt);
         return std::string{decl.variable.name} + " HAS_TYPE " + std::string{decl.type.name};
     }
 
-    if (std::holds_alternative<AstNodeVarAssignment>(stmt)) {
-        auto assignment = std::get<AstNodeVarAssignment>(stmt);
+    if (std::holds_alternative<ast::VarAssignment>(stmt)) {
+        auto assignment = std::get<ast::VarAssignment>(stmt);
         return printExpression(assignment.lhs, functions) + " := " + printExpression(assignment.rhs, functions);
     }
 
-    if (const auto scope = to<AstNodeScope>(stmt)) {
+    if (const auto scope = to<ast::Scope>(stmt)) {
         auto out = std::stringstream{};
         out << "{\n";
         for (const auto &subStmt : scope->statements) {
@@ -106,8 +106,8 @@ std::string printStatement(const AstNodeStmt &stmt, const FuncDefs &functions) {
         return out.str();
     }
 
-    if (is<AstNodeIfBlock>(stmt)) {
-        auto const &ifBlock = as<AstNodeIfBlock>(stmt);
+    if (is<ast::IfBlock>(stmt)) {
+        auto const &ifBlock = as<ast::IfBlock>(stmt);
 
         auto out = std::stringstream{};
 
@@ -126,17 +126,17 @@ std::string printStatement(const AstNodeStmt &stmt, const FuncDefs &functions) {
         return out.str();
     }
 
-    if (is<AstNodeWhileLoop>(stmt)) {
-        auto const &loop = as<AstNodeWhileLoop>(stmt);
+    if (is<ast::WhileLoop>(stmt)) {
+        auto const &loop = as<ast::WhileLoop>(stmt);
         return "WHILE (" + printExpression(loop.condition, functions) + ") {\n" +
                printStatement(*loop.body, functions) + "\n}";
     }
 
-    if (is<AstNodeBreakStmt>(stmt)) {
+    if (is<ast::BreakStmt>(stmt)) {
         return "BREAK";
     }
 
-    if (is<AstNodeContinueStmt>(stmt)) {
+    if (is<ast::ContinueStmt>(stmt)) {
         return "CONTINUE";
     }
 

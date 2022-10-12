@@ -71,7 +71,7 @@ std::string typeNameToCppTypeName(TokenIdentifier typeName) {
     return std::string{name};
 }
 
-std::string returnTypeToCppTypeName(std::vector<TypedVariable> const &returnTypes) {
+std::string returnTypeToCppTypeName(std::vector<ast::TypedVariable> const &returnTypes) {
     auto typesNum = std::ssize(returnTypes);
 
     if (typesNum == 0) {
@@ -97,14 +97,14 @@ std::string returnTypeToCppTypeName(std::vector<TypedVariable> const &returnType
 }
 
 void writeRetValDeclaration(std::ostream &output, DeclaredVars &declared,
-                            std::vector<TypedVariable> const &returnVals) {
+                            std::vector<ast::TypedVariable> const &returnVals) {
     for (auto const &[retName, retType] : returnVals) {
         output << "auto " << retName.name << " = " << typeNameToCppTypeName(retType) << "{};\n";
         declared.insert(std::string{retName.name});
     }
 }
 
-void writeReturnStatement(std::ostream &output, std::vector<TypedVariable> const &returnVals) {
+void writeReturnStatement(std::ostream &output, std::vector<ast::TypedVariable> const &returnVals) {
     auto retValsNum = std::ssize(returnVals);
 
     if (retValsNum == 0) {
@@ -129,19 +129,19 @@ void writeReturnStatement(std::ostream &output, std::vector<TypedVariable> const
     output << ");" << std::endl;
 }
 
-std::string writeTemporaryAssignment(std::ostream &output, const AstNodeExpr &expr, bool isRef);
+std::string writeTemporaryAssignment(std::ostream &output, const ast::Expr &expr, bool isRef);
 
-std::string generateFuncCallStr(std::ostream &output, const AstNodeFuncCall &funcCall) {
+std::string generateFuncCallStr(std::ostream &output, const ast::FuncCall &funcCall) {
     auto args = std::vector<std::string>{};
     for (const auto &argExpr : funcCall.arguments) {
         args.emplace_back(writeTemporaryAssignment(output, argExpr, false));
     }
 
-    if (!is<AstNodeIdentifier>(*funcCall.object)) {
+    if (!is<ast::Identifier>(*funcCall.object)) {
         std::cerr << "Right now complex expressions can't be called." << std::endl;
         return "INVALID";
     }
-    auto const &funcName = as<AstNodeIdentifier>(*funcCall.object);
+    auto const &funcName = as<ast::Identifier>(*funcCall.object);
 
     auto funcCallStr = std::stringstream{};
     funcCallStr << funcName.value.name << "(";
@@ -186,54 +186,54 @@ char const *getBinaryOperationStr(Token const &op) {
     assert(false);
 }
 
-std::string writeTemporaryAssignment(std::ostream &output, const AstNodeExpr &expr, bool isRef) {
+std::string writeTemporaryAssignment(std::ostream &output, const ast::Expr &expr, bool isRef) {
     auto writeDecl = [&output, &isRef](const auto &value) -> std::string {
         auto name = getTmpVarName();
         output << (isRef ? "auto &" : "auto ") << name << " = " << value << ";\n";
         return name;
     };
 
-    if (const auto literal = to<AstNodeIntLiteral>(expr)) {
+    if (const auto literal = to<ast::IntLiteral>(expr)) {
         return writeDecl(literal->value.value);
     }
 
-    if (const auto literal = to<AstNodeStringLiteral>(expr)) {
+    if (const auto literal = to<ast::StringLiteral>(expr)) {
         auto escapedStr = "R\"IMPL_STR_LITERAL(" + std::string{literal->value.value} + ")IMPL_STR_LITERAL\"";
         return writeDecl(escapedStr);
     }
 
-    if (is<AstNodeBoolLiteral>(expr)) {
-        auto const &literal = as<AstNodeBoolLiteral>(expr);
+    if (is<ast::BoolLiteral>(expr)) {
+        auto const &literal = as<ast::BoolLiteral>(expr);
         return writeDecl(literal.value.value ? "true" : "false");
     }
 
-    if (const auto identifier = to<AstNodeIdentifier>(expr)) {
+    if (const auto identifier = to<ast::Identifier>(expr)) {
         return writeDecl(identifier->value.name);
     }
 
-    if (const auto funcCall = to<AstNodeFuncCall>(expr)) {
+    if (const auto funcCall = to<ast::FuncCall>(expr)) {
         auto funcCallStr = generateFuncCallStr(output, *funcCall);
         return writeDecl(funcCallStr);
     }
 
-    if (auto const binaryOp = to<AstNodeBinaryOp>(expr)) {
+    if (auto const binaryOp = to<ast::BinaryOp>(expr)) {
         auto lhs = writeTemporaryAssignment(output, *binaryOp->lhs, isRef);
         auto rhs = writeTemporaryAssignment(output, *binaryOp->rhs, isRef);
         auto const *op = getBinaryOperationStr(binaryOp->op);
         return writeDecl(lhs + " " + op + " " + rhs);
     }
 
-    if (const auto negation = to<AstNodeNegation>(expr)) {
+    if (const auto negation = to<ast::Negation>(expr)) {
         auto rhs = writeTemporaryAssignment(output, *negation->operand, isRef);
         return writeDecl("-" + rhs);
     }
 
-    if (const auto funcDef = to<AstNodeFuncRef>(expr)) {
+    if (const auto funcDef = to<ast::FuncRef>(expr)) {
         return writeDecl(funcDef->generatedName);
     }
 
-    if (is<AstNodeMemberAccess>(expr)) {
-        auto const &memAcc = as<AstNodeMemberAccess>(expr);
+    if (is<ast::MemberAccess>(expr)) {
+        auto const &memAcc = as<ast::MemberAccess>(expr);
         auto obj = writeTemporaryAssignment(output, *memAcc.object, isRef);
         auto mName = std::string{memAcc.member.name};
         return writeDecl(obj + "." + mName);
@@ -243,7 +243,7 @@ std::string writeTemporaryAssignment(std::ostream &output, const AstNodeExpr &ex
     assert(false);
 }
 
-void writeDeclaration(std::ostream &output, DeclaredVars &declared, AstNodeDeclaration const &decl) {
+void writeDeclaration(std::ostream &output, DeclaredVars &declared, ast::Declaration const &decl) {
     auto const varName = std::string{decl.variable.name};
     if (declared.contains(varName)) {
         std::cerr << "Cannot forward-declare an already declared variable." << std::endl;
@@ -254,12 +254,12 @@ void writeDeclaration(std::ostream &output, DeclaredVars &declared, AstNodeDecla
     declared.insert(varName);
 }
 
-void writeAssignment(std::ostream &output, DeclaredVars &declared, const AstNodeVarAssignment &assignment) {
+void writeAssignment(std::ostream &output, DeclaredVars &declared, const ast::VarAssignment &assignment) {
     auto lhs = std::string{};
     bool declareNewVar = false;
 
-    if (is<AstNodeIdentifier>(assignment.lhs)) {
-        auto varName = std::string{as<AstNodeIdentifier>(assignment.lhs).value.name};
+    if (is<ast::Identifier>(assignment.lhs)) {
+        auto varName = std::string{as<ast::Identifier>(assignment.lhs).value.name};
         if (!declared.contains(varName)) {
             lhs = varName;
             declareNewVar = true;
@@ -275,10 +275,10 @@ void writeAssignment(std::ostream &output, DeclaredVars &declared, const AstNode
     output << (declareNewVar ? "auto " : "") << lhs << " = " << rhs << ";\n";
 }
 
-void writeStatementList(std::ostream &output, DeclaredVars &declared, const StmtList &stmts);
-void writeStatement(std::ostream &output, DeclaredVars &declared, const AstNodeStmt &stmt);
+void writeStatementList(std::ostream &output, DeclaredVars &declared, const ast::StmtList &stmts);
+void writeStatement(std::ostream &output, DeclaredVars &declared, const ast::Stmt &stmt);
 
-void writeScope(std::ostream &output, DeclaredVars &declared, AstNodeScope const &scope) {
+void writeScope(std::ostream &output, DeclaredVars &declared, ast::Scope const &scope) {
     auto declaredBefore = declared;
     output << "{\n";
     writeStatementList(output, declared, scope.statements);
@@ -286,7 +286,7 @@ void writeScope(std::ostream &output, DeclaredVars &declared, AstNodeScope const
     declared = std::move(declaredBefore);
 }
 
-void writeIfElifElse(std::ostream &output, DeclaredVars &declared, AstNodeIfBlock const &ifElifElse) {
+void writeIfElifElse(std::ostream &output, DeclaredVars &declared, ast::IfBlock const &ifElifElse) {
     assert(ifElifElse.brIfElif.size() >= 1);
 
     auto declaredBefore = declared;
@@ -312,7 +312,7 @@ void writeIfElifElse(std::ostream &output, DeclaredVars &declared, AstNodeIfBloc
     declared = std::move(declaredBefore);
 }
 
-void writeWhileLoop(std::ostream &output, DeclaredVars &declared, AstNodeWhileLoop const &loop) {
+void writeWhileLoop(std::ostream &output, DeclaredVars &declared, ast::WhileLoop const &loop) {
     auto declaredBefore = declared;
 
     output << "while (true) {\n";
@@ -324,52 +324,52 @@ void writeWhileLoop(std::ostream &output, DeclaredVars &declared, AstNodeWhileLo
     declared = std::move(declaredBefore);
 }
 
-void writeStatement(std::ostream &output, DeclaredVars &declared, const AstNodeStmt &stmt) {
-    if (is<AstNodeStructDecl>(stmt)) {
+void writeStatement(std::ostream &output, DeclaredVars &declared, const ast::Stmt &stmt) {
+    if (is<ast::StructDecl>(stmt)) {
         // Handled elsewhere.
         return;
     }
 
-    if (is<AstNodeDeclaration>(stmt)) {
-        auto const &decl = as<AstNodeDeclaration>(stmt);
+    if (is<ast::Declaration>(stmt)) {
+        auto const &decl = as<ast::Declaration>(stmt);
         writeDeclaration(output, declared, decl);
         return;
     }
 
-    if (const auto &assignment = to<AstNodeVarAssignment>(stmt)) {
+    if (const auto &assignment = to<ast::VarAssignment>(stmt)) {
         writeAssignment(output, declared, *assignment);
         return;
     }
 
-    if (is<AstNodeExpr>(stmt)) {
-        auto const &expr = as<AstNodeExpr>(stmt);
+    if (is<ast::Expr>(stmt)) {
+        auto const &expr = as<ast::Expr>(stmt);
         writeTemporaryAssignment(output, expr, false);
         return;
     }
 
-    if (auto const &scope = to<AstNodeScope>(stmt)) {
+    if (auto const &scope = to<ast::Scope>(stmt)) {
         writeScope(output, declared, *scope);
         return;
     }
 
-    if (is<AstNodeIfBlock>(stmt)) {
-        auto const &ifElifElse = as<AstNodeIfBlock>(stmt);
+    if (is<ast::IfBlock>(stmt)) {
+        auto const &ifElifElse = as<ast::IfBlock>(stmt);
         writeIfElifElse(output, declared, ifElifElse);
         return;
     }
 
-    if (is<AstNodeWhileLoop>(stmt)) {
-        auto const &loop = as<AstNodeWhileLoop>(stmt);
+    if (is<ast::WhileLoop>(stmt)) {
+        auto const &loop = as<ast::WhileLoop>(stmt);
         writeWhileLoop(output, declared, loop);
         return;
     }
 
-    if (is<AstNodeBreakStmt>(stmt)) {
+    if (is<ast::BreakStmt>(stmt)) {
         output << "break;\n";
         return;
     }
 
-    if (is<AstNodeContinueStmt>(stmt)) {
+    if (is<ast::ContinueStmt>(stmt)) {
         output << "continue;\n";
         return;
     }
@@ -378,13 +378,13 @@ void writeStatement(std::ostream &output, DeclaredVars &declared, const AstNodeS
     assert(false);
 }
 
-void writeStatementList(std::ostream &output, DeclaredVars &declared, const StmtList &stmts) {
+void writeStatementList(std::ostream &output, DeclaredVars &declared, const ast::StmtList &stmts) {
     for (const auto &stmt : stmts) {
         writeStatement(output, declared, stmt);
     }
 }
 
-void writeFunctionHeader(std::ostream &output, const std::string &name, const FunctionDefinition &func) {
+void writeFunctionHeader(std::ostream &output, const std::string &name, const ast::FunctionDefinition &func) {
     output << returnTypeToCppTypeName(func.returnVals) << " " << name << "(";
     for (auto i = 0; i < ssize(func.arguments); ++i) {
         if (i > 0) {
@@ -396,12 +396,12 @@ void writeFunctionHeader(std::ostream &output, const std::string &name, const Fu
     output << ")";
 }
 
-void writeFunctionDeclaration(std::ostream &output, const std::string &name, const FunctionDefinition &func) {
+void writeFunctionDeclaration(std::ostream &output, const std::string &name, const ast::FunctionDefinition &func) {
     writeFunctionHeader(output, name, func);
     output << ";" << std::endl;
 }
 
-void writeFunctionDefinition(std::ostream &output, const std::string &name, const FunctionDefinition &func) {
+void writeFunctionDefinition(std::ostream &output, const std::string &name, const ast::FunctionDefinition &func) {
     writeFunctionHeader(output, name, func);
 
     auto declared = DeclaredVars{};
@@ -412,7 +412,7 @@ void writeFunctionDefinition(std::ostream &output, const std::string &name, cons
     output << "}" << std::endl;
 }
 
-void writeStruct(std::ostream &output, AstNodeStructDecl const &structDecl) {
+void writeStruct(std::ostream &output, ast::StructDecl const &structDecl) {
     auto const &name = structDecl.name.name;
     auto const &members = structDecl.definition.members;
 
@@ -423,17 +423,17 @@ void writeStruct(std::ostream &output, AstNodeStructDecl const &structDecl) {
     output << "};\n";
 }
 
-void writeUserStructs(std::ostream &output, StmtList const &stmts) {
+void writeUserStructs(std::ostream &output, ast::StmtList const &stmts) {
     auto structs = std::span(stmts.begin(), stmts.end()) |
-                   std::views::filter([](auto const &stmt) { return is<AstNodeStructDecl>(stmt); }) |
-                   std::views::transform([](auto const &stmt) { return as<AstNodeStructDecl>(stmt); });
+                   std::views::filter([](auto const &stmt) { return is<ast::StructDecl>(stmt); }) |
+                   std::views::transform([](auto const &stmt) { return as<ast::StructDecl>(stmt); });
 
     for (auto const &structDecl : structs) {
         writeStruct(output, structDecl);
     }
 }
 
-void writeUserFunctions(std::ostream &output, const FuncDefs &funcDefs) {
+void writeUserFunctions(std::ostream &output, const ast::FuncDefs &funcDefs) {
     (void)funcDefs;
 
     auto declarations = std::stringstream{};
@@ -448,7 +448,7 @@ void writeUserFunctions(std::ostream &output, const FuncDefs &funcDefs) {
     output << definitions.str() << std::endl;
 }
 
-void writeMain(std::ostream &output, const StmtList &ast) {
+void writeMain(std::ostream &output, const ast::StmtList &ast) {
     auto declared = DeclaredVars{};
     output << "int main() {\n";
     writeStatementList(output, declared, ast);

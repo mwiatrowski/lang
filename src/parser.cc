@@ -40,18 +40,18 @@ template <typename TokenType> [[nodiscard]] TokensSpan consumeUntil(TokensSpan t
 
 struct ParserContext {
     TokensSpan tokens;
-    FuncDefs functions;
+    ast::FuncDefs functions;
     int nextId{0};
 };
 
 std::string generateNewFunctionName(ParserContext &ctx) { return "__temp_func_" + std::to_string(ctx.nextId++); }
 
-using TypedArgList = decltype(FunctionDefinition::arguments);
+using TypedArgList = decltype(ast::FunctionDefinition::arguments);
 
 template <typename FnConsume> using ConsumedType = std::invoke_result<FnConsume, ParserContext &>::type::value_type;
 
-std::optional<AstNodeExpr> consumeExpression(ParserContext &ctx);
-std::optional<AstNodeStmt> consumeStatement(ParserContext &ctx);
+std::optional<ast::Expr> consumeExpression(ParserContext &ctx);
+std::optional<ast::Stmt> consumeStatement(ParserContext &ctx);
 
 template <typename TokenType> std::optional<TokenType> consumeToken(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
@@ -122,7 +122,7 @@ auto consumeDelimitedNoTrailing(ParserContext &ctx, FnGetElem consumeElem, FnGet
     return result;
 }
 
-std::optional<AstNodeExpr> consumeParenthesizedExpression(ParserContext &ctx) {
+std::optional<ast::Expr> consumeParenthesizedExpression(ParserContext &ctx) {
     if (!consumeToken<TokenLBrace>(ctx)) {
         std::cerr << "Expected an opening brace." << std::endl;
         return {};
@@ -142,7 +142,7 @@ std::optional<AstNodeExpr> consumeParenthesizedExpression(ParserContext &ctx) {
     return expr;
 }
 
-std::optional<TypedVariable> consumeTypedVariable(ParserContext &ctx) {
+std::optional<ast::TypedVariable> consumeTypedVariable(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
 
     if (!peek<TokenIdentifier, TokenColon, TokenIdentifier>(tokens)) {
@@ -156,7 +156,7 @@ std::optional<TypedVariable> consumeTypedVariable(ParserContext &ctx) {
     assert(variable);
     assert(typeName);
 
-    return TypedVariable{.varName = std::move(*variable), .varType = std::move(*typeName)};
+    return ast::TypedVariable{.varName = std::move(*variable), .varType = std::move(*typeName)};
 }
 
 std::optional<TypedArgList> consumeTypedArgList(ParserContext &ctx) {
@@ -209,7 +209,7 @@ std::optional<TypedArgList> consumeTypedArgList(ParserContext &ctx) {
     return {};
 }
 
-std::optional<AstNodeFuncRef> consumeFunctionDefinition(ParserContext &ctx) {
+std::optional<ast::FuncRef> consumeFunctionDefinition(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
 
     if (!peek<TokenKwFn>(tokens)) {
@@ -242,15 +242,15 @@ std::optional<AstNodeFuncRef> consumeFunctionDefinition(ParserContext &ctx) {
         return {};
     }
 
-    auto funcDef = FunctionDefinition{
+    auto funcDef = ast::FunctionDefinition{
         .arguments = std::move(*funcArgs), .returnVals = std::move(*funcRetVals), .functionBody = std::move(*funcBody)};
     auto funcName = generateNewFunctionName(ctx);
     ctx.functions[funcName] = std::move(funcDef);
 
-    return AstNodeFuncRef{.generatedName = funcName};
+    return ast::FuncRef{.generatedName = funcName};
 }
 
-std::optional<AstNodeStructDef> consumeStructDefinition(ParserContext &ctx) {
+std::optional<ast::StructDef> consumeStructDefinition(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
 
     if (!peek<TokenKwStruct, TokenLCurBrace>(tokens)) {
@@ -267,10 +267,10 @@ std::optional<AstNodeStructDef> consumeStructDefinition(ParserContext &ctx) {
         return {};
     }
 
-    return AstNodeStructDef{.members = std::move(members)};
+    return ast::StructDef{.members = std::move(members)};
 }
 
-std::optional<AstNodeScope> consumeScopedStmtList(ParserContext &ctx) {
+std::optional<ast::Scope> consumeScopedStmtList(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
 
     if (!peek<TokenLCurBrace>(tokens)) {
@@ -279,7 +279,7 @@ std::optional<AstNodeScope> consumeScopedStmtList(ParserContext &ctx) {
     }
     std::tie(std::ignore, tokens) = consume<TokenLCurBrace>(tokens);
 
-    auto stmts = std::vector<AstNodeStmt>{};
+    auto stmts = std::vector<ast::Stmt>{};
     while (!peek<TokenRCurBrace>(tokens)) {
         auto stmt = consumeStatement(ctx);
         if (!stmt) {
@@ -293,10 +293,10 @@ std::optional<AstNodeScope> consumeScopedStmtList(ParserContext &ctx) {
     assert(peek<TokenRCurBrace>(tokens));
     std::tie(std::ignore, tokens) = consume<TokenRCurBrace>(tokens);
 
-    return AstNodeScope{.statements = std::move(stmts)};
+    return ast::Scope{.statements = std::move(stmts)};
 }
 
-std::optional<std::vector<AstNodeExpr>> consumeFunctionCallArguments(ParserContext &ctx) {
+std::optional<std::vector<ast::Expr>> consumeFunctionCallArguments(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
 
     if (!peek<TokenLBrace>(tokens)) {
@@ -316,7 +316,7 @@ std::optional<std::vector<AstNodeExpr>> consumeFunctionCallArguments(ParserConte
     return {std::move(arguments)};
 }
 
-std::optional<AstNodeExpr> consumeAtomExpression(ParserContext &ctx) {
+std::optional<ast::Expr> consumeAtomExpression(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
 
     if (peek<TokenLBrace>(tokens)) {
@@ -326,37 +326,37 @@ std::optional<AstNodeExpr> consumeAtomExpression(ParserContext &ctx) {
     if (peek<TokenIdentifier>(tokens)) {
         auto [tokenIdentifier, tokensTail] = consume<TokenIdentifier>(tokens);
         tokens = tokensTail;
-        return AstNodeExpr{AstNodeIdentifier{.value = tokenIdentifier}};
+        return ast::Expr{ast::Identifier{.value = tokenIdentifier}};
     }
 
     if (peek<TokenIntLiteral>(tokens)) {
         auto [tokenLiteral, tokensTail] = consume<TokenIntLiteral>(tokens);
         tokens = tokensTail;
-        return AstNodeExpr{AstNodeIntLiteral{.value = tokenLiteral}};
+        return ast::Expr{ast::IntLiteral{.value = tokenLiteral}};
     }
 
     if (peek<TokenStringLiteral>(tokens)) {
         auto [tokenLiteral, tokensTail] = consume<TokenStringLiteral>(tokens);
         tokens = tokensTail;
-        return AstNodeExpr{AstNodeStringLiteral{.value = tokenLiteral}};
+        return ast::Expr{ast::StringLiteral{.value = tokenLiteral}};
     }
 
     if (peek<TokenBoolLiteral>(tokens)) {
         auto tokenLiteral = consumeToken<TokenBoolLiteral>(ctx);
         assert(tokenLiteral.has_value());
-        return AstNodeExpr{AstNodeBoolLiteral{.value = *tokenLiteral}};
+        return ast::Expr{ast::BoolLiteral{.value = *tokenLiteral}};
     }
 
     // TODO: Function definitions should be handled more like structs.
     if (peek<TokenKwFn>(tokens)) {
         auto funcDef = consumeFunctionDefinition(ctx);
-        return funcDef.has_value() ? std::optional<AstNodeExpr>{*funcDef} : std::optional<AstNodeExpr>{};
+        return funcDef.has_value() ? std::optional<ast::Expr>{*funcDef} : std::optional<ast::Expr>{};
     }
 
     return {};
 }
 
-std::optional<AstNodeExpr> consumeBasicExpression(ParserContext &ctx) {
+std::optional<ast::Expr> consumeBasicExpression(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
 
     if (peek<TokenMinus>(tokens)) {
@@ -366,7 +366,7 @@ std::optional<AstNodeExpr> consumeBasicExpression(ParserContext &ctx) {
             std::cerr << "Expected an expression after a unary minus" << std::endl;
             return {};
         }
-        return AstNodeExpr{AstNodeNegation{.operand = {std::move(*expr)}}};
+        return ast::Expr{ast::Negation{.operand = {std::move(*expr)}}};
     }
 
     auto resultExpr = consumeAtomExpression(ctx);
@@ -381,8 +381,8 @@ std::optional<AstNodeExpr> consumeBasicExpression(ParserContext &ctx) {
             auto memberName = consumeToken<TokenIdentifier>(ctx);
             assert(memberName);
 
-            auto memAcc = AstNodeMemberAccess{.object = {std::move(*resultExpr)}, .member = std::move(*memberName)};
-            resultExpr = AstNodeExpr{std::move(memAcc)};
+            auto memAcc = ast::MemberAccess{.object = {std::move(*resultExpr)}, .member = std::move(*memberName)};
+            resultExpr = ast::Expr{std::move(memAcc)};
 
             continue;
         }
@@ -394,8 +394,8 @@ std::optional<AstNodeExpr> consumeBasicExpression(ParserContext &ctx) {
                 return {};
             }
 
-            auto funcCall = AstNodeFuncCall{.object = {std::move(*resultExpr)}, .arguments = std::move(*args)};
-            resultExpr = AstNodeExpr{std::move(funcCall)};
+            auto funcCall = ast::FuncCall{.object = {std::move(*resultExpr)}, .arguments = std::move(*args)};
+            resultExpr = ast::Expr{std::move(funcCall)};
 
             continue;
         }
@@ -412,7 +412,7 @@ std::optional<Token> consumeBinaryOperator(ParserContext &ctx) {
                              TokenEqual, TokenNotEqual>(ctx);
 }
 
-std::optional<AstNodeExpr> consumeExpression(ParserContext &ctx) {
+std::optional<ast::Expr> consumeExpression(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
 
     auto firstBasicExpr = consumeBasicExpression(ctx);
@@ -421,7 +421,7 @@ std::optional<AstNodeExpr> consumeExpression(ParserContext &ctx) {
         return {};
     }
 
-    auto subExprs = std::vector<AstNodeExpr>{*firstBasicExpr};
+    auto subExprs = std::vector<ast::Expr>{*firstBasicExpr};
     auto operators = std::vector<Token>{};
 
     while (!tokens.empty()) {
@@ -451,22 +451,22 @@ std::optional<AstNodeExpr> consumeExpression(ParserContext &ctx) {
         auto rhs = std::move(subExprs.at(i + 1));
         auto op = operators.at(i);
 
-        auto newLhs = AstNodeBinaryOp{.op = op, .lhs = {std::move(lhs)}, .rhs = {std::move(rhs)}};
-        lhs = AstNodeExpr{std::move(newLhs)};
+        auto newLhs = ast::BinaryOp{.op = op, .lhs = {std::move(lhs)}, .rhs = {std::move(rhs)}};
+        lhs = ast::Expr{std::move(newLhs)};
     }
     return lhs;
 }
 
-std::optional<AstNodeStmt> consumeDeclaration(ParserContext &ctx) {
+std::optional<ast::Stmt> consumeDeclaration(ParserContext &ctx) {
     auto tVar = consumeTypedVariable(ctx);
     if (!tVar) {
         std::cerr << "Expected a variable declaration." << std::endl;
         return {};
     }
-    return AstNodeStmt{AstNodeDeclaration{.variable = std::move(tVar->varName), .type = std::move(tVar->varType)}};
+    return ast::Stmt{ast::Declaration{.variable = std::move(tVar->varName), .type = std::move(tVar->varType)}};
 }
 
-std::optional<AstNodeStmt> consumeAssignmentOrExpression(ParserContext &ctx) {
+std::optional<ast::Stmt> consumeAssignmentOrExpression(ParserContext &ctx) {
     auto lhs = consumeExpression(ctx);
     if (!lhs) {
         std::cerr << "Expected an assignment left-hand side." << std::endl;
@@ -474,7 +474,7 @@ std::optional<AstNodeStmt> consumeAssignmentOrExpression(ParserContext &ctx) {
     }
 
     if (!consumeToken<TokenAssignment>(ctx)) {
-        return AstNodeStmt{std::move(*lhs)};
+        return ast::Stmt{std::move(*lhs)};
     }
 
     auto rhs = consumeExpression(ctx);
@@ -483,10 +483,10 @@ std::optional<AstNodeStmt> consumeAssignmentOrExpression(ParserContext &ctx) {
         return {};
     }
 
-    return AstNodeStmt{AstNodeVarAssignment{.lhs = std::move(*lhs), .rhs = std::move(*rhs)}};
+    return ast::Stmt{ast::VarAssignment{.lhs = std::move(*lhs), .rhs = std::move(*rhs)}};
 }
 
-std::optional<AstNodeStmt> consumeStructDeclaration(ParserContext &ctx) {
+std::optional<ast::Stmt> consumeStructDeclaration(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
 
     if (!peek<TokenIdentifier, TokenAssignment, TokenKwStruct>(tokens)) {
@@ -504,13 +504,13 @@ std::optional<AstNodeStmt> consumeStructDeclaration(ParserContext &ctx) {
         return {};
     }
 
-    auto structDecl = AstNodeStructDecl{.name = std::move(*name), .definition = std::move(*structDef)};
-    return AstNodeStmt{std::move(structDecl)};
+    auto structDecl = ast::StructDecl{.name = std::move(*name), .definition = std::move(*structDef)};
+    return ast::Stmt{std::move(structDecl)};
 }
 
 template <typename InitialKeyword>
 requires(std::same_as<InitialKeyword, TokenKwIf> ||
-         std::same_as<InitialKeyword, TokenKwElif>) std::optional<Branch> consumeIfElifBranch(ParserContext &ctx) {
+         std::same_as<InitialKeyword, TokenKwElif>) std::optional<ast::Branch> consumeIfelifBranch(ParserContext &ctx) {
     auto kw = consumeToken<InitialKeyword>(ctx);
     if (!kw) {
         std::cerr << "Expected " << printToken(InitialKeyword{}) << std::endl;
@@ -529,10 +529,10 @@ requires(std::same_as<InitialKeyword, TokenKwIf> ||
         return {};
     }
 
-    return Branch{std::move(*condition), std::move(*body)};
+    return ast::Branch{std::move(*condition), std::move(*body)};
 }
 
-std::optional<AstNodeStmt> consumeElseBranch(ParserContext &ctx) {
+std::optional<ast::Stmt> consumeElseBranch(ParserContext &ctx) {
     auto kw = consumeToken<TokenKwElse>(ctx);
     if (!kw) {
         std::cerr << "Expected " << printToken(TokenKwElse{}) << std::endl;
@@ -548,13 +548,13 @@ std::optional<AstNodeStmt> consumeElseBranch(ParserContext &ctx) {
     return body;
 }
 
-std::optional<AstNodeIfBlock> consumeIfElifElse(ParserContext &ctx) {
+std::optional<ast::IfBlock> consumeIfElifElse(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
 
-    auto brIfElif = std::vector<Branch>{};
-    auto brElse = ValuePtr<AstNodeStmt>{};
+    auto brIfElif = std::vector<ast::Branch>{};
+    auto brElse = ValuePtr<ast::Stmt>{};
 
-    auto ifBranch = consumeIfElifBranch<TokenKwIf>(ctx);
+    auto ifBranch = consumeIfelifBranch<TokenKwIf>(ctx);
     if (!ifBranch) {
         std::cerr << "Expected an 'if' branch." << std::endl;
         return {};
@@ -562,7 +562,7 @@ std::optional<AstNodeIfBlock> consumeIfElifElse(ParserContext &ctx) {
     brIfElif.push_back(std::move(*ifBranch));
 
     while (peek<TokenKwElif>(tokens)) {
-        auto elifBranch = consumeIfElifBranch<TokenKwElif>(ctx);
+        auto elifBranch = consumeIfelifBranch<TokenKwElif>(ctx);
         if (!elifBranch) {
             std::cerr << "Expected an 'elif' branch." << std::endl;
             return {};
@@ -579,10 +579,10 @@ std::optional<AstNodeIfBlock> consumeIfElifElse(ParserContext &ctx) {
         brElse = {std::move(*elseBranch)};
     }
 
-    return AstNodeIfBlock{.brIfElif = std::move(brIfElif), .brElse = std::move(brElse)};
+    return ast::IfBlock{.brIfElif = std::move(brIfElif), .brElse = std::move(brElse)};
 }
 
-std::optional<AstNodeWhileLoop> consumeWhileLoop(ParserContext &ctx) {
+std::optional<ast::WhileLoop> consumeWhileLoop(ParserContext &ctx) {
     if (!consumeToken<TokenKwWhile>(ctx)) {
         std::cerr << "Expected the 'while' keyword" << std::endl;
         return {};
@@ -600,10 +600,10 @@ std::optional<AstNodeWhileLoop> consumeWhileLoop(ParserContext &ctx) {
         return {};
     }
 
-    return AstNodeWhileLoop{.condition = std::move(*condition), .body = {std::move(*body)}};
+    return ast::WhileLoop{.condition = std::move(*condition), .body = {std::move(*body)}};
 }
 
-std::optional<AstNodeStmt> consumeStatement(ParserContext &ctx) {
+std::optional<ast::Stmt> consumeStatement(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
 
     if (peek<TokenIdentifier, TokenColon>(tokens)) {
@@ -615,27 +615,27 @@ std::optional<AstNodeStmt> consumeStatement(ParserContext &ctx) {
         if (!scope) {
             return {};
         }
-        return AstNodeStmt{std::move(*scope)};
+        return ast::Stmt{std::move(*scope)};
     }
 
     if (peek<TokenKwIf>(tokens)) {
         auto ifElifElse = consumeIfElifElse(ctx);
-        return ifElifElse.has_value() ? AstNodeStmt{std::move(*ifElifElse)} : std::optional<AstNodeStmt>{};
+        return ifElifElse.has_value() ? ast::Stmt{std::move(*ifElifElse)} : std::optional<ast::Stmt>{};
     }
 
     if (peek<TokenKwWhile>(tokens)) {
         auto loop = consumeWhileLoop(ctx);
-        return loop ? AstNodeStmt{std::move(*loop)} : std::optional<AstNodeStmt>{};
+        return loop ? ast::Stmt{std::move(*loop)} : std::optional<ast::Stmt>{};
     }
 
     if (peek<TokenKwBreak>(tokens)) {
         consumeToken<TokenKwBreak>(ctx);
-        return AstNodeStmt{AstNodeBreakStmt{}};
+        return ast::Stmt{ast::BreakStmt{}};
     }
 
     if (peek<TokenKwContinue>(tokens)) {
         consumeToken<TokenKwContinue>(ctx);
-        return AstNodeStmt{AstNodeContinueStmt{}};
+        return ast::Stmt{ast::ContinueStmt{}};
     }
 
     if (peek<TokenIdentifier, TokenAssignment, TokenKwStruct>(tokens)) {
@@ -645,9 +645,9 @@ std::optional<AstNodeStmt> consumeStatement(ParserContext &ctx) {
     return consumeAssignmentOrExpression(ctx);
 }
 
-StmtList consumeStmtList(ParserContext &ctx) {
+ast::StmtList consumeStmtList(ParserContext &ctx) {
     auto &tokens = ctx.tokens;
-    auto stmts = StmtList{};
+    auto stmts = ast::StmtList{};
 
     while (!tokens.empty()) {
         auto tokensSizeBeforeParse = tokens.size();

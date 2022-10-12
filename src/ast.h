@@ -9,115 +9,117 @@
 #include "tokens.h"
 #include "value_ptr.h"
 
-struct AstNodeExpr;
-struct AstNodeStmt;
+namespace ast {
 
-using StmtList = std::vector<AstNodeStmt>;
+struct Expr;
+struct Stmt;
 
-struct AstNodeIntLiteral {
+using StmtList = std::vector<ast::Stmt>;
+
+struct IntLiteral {
     TokenIntLiteral value;
 };
-struct AstNodeStringLiteral {
+struct StringLiteral {
     TokenStringLiteral value;
 };
-struct AstNodeBoolLiteral {
+struct BoolLiteral {
     TokenBoolLiteral value;
 };
-struct AstNodeIdentifier {
+struct Identifier {
     TokenIdentifier value;
 };
 
-struct AstNodeFuncCall {
-    ValuePtr<AstNodeExpr> object;
-    std::vector<AstNodeExpr> arguments;
+struct FuncCall {
+    ValuePtr<Expr> object;
+    std::vector<Expr> arguments;
 };
 
-struct AstNodeBinaryOp {
+struct BinaryOp {
     Token op;
-    ValuePtr<AstNodeExpr> lhs;
-    ValuePtr<AstNodeExpr> rhs;
+    ValuePtr<Expr> lhs;
+    ValuePtr<Expr> rhs;
 };
 
-struct AstNodeNegation {
-    ValuePtr<AstNodeExpr> operand;
+struct Negation {
+    ValuePtr<Expr> operand;
 };
 
-struct AstNodeFuncRef {
+struct FuncRef {
     std::string generatedName;
 };
 
-struct AstNodeMemberAccess {
-    ValuePtr<AstNodeExpr> object;
+struct MemberAccess {
+    ValuePtr<Expr> object;
     TokenIdentifier member;
 };
 
-struct AstNodeExpr
-    : public std::variant<AstNodeIntLiteral, AstNodeStringLiteral, AstNodeBoolLiteral, AstNodeIdentifier,
-                          AstNodeFuncCall, AstNodeBinaryOp, AstNodeNegation, AstNodeFuncRef, AstNodeMemberAccess> {};
+struct Expr : public std::variant<IntLiteral, StringLiteral, BoolLiteral, Identifier, FuncCall, BinaryOp, Negation,
+                                  FuncRef, MemberAccess> {};
 
 struct TypedVariable {
     TokenIdentifier varName;
     TokenIdentifier varType;
 };
 
-struct AstNodeStructDef {
+struct StructDef {
     std::vector<TypedVariable> members;
 };
 
-struct AstNodeStructDecl {
+struct StructDecl {
     TokenIdentifier name;
-    AstNodeStructDef definition;
+    StructDef definition;
 };
 
 // TODO unify with variable assignment
-struct AstNodeDeclaration {
+struct Declaration {
     TokenIdentifier variable;
     TokenIdentifier type;
 };
 
-struct AstNodeVarAssignment {
-    AstNodeExpr lhs;
-    AstNodeExpr rhs;
+struct VarAssignment {
+    Expr lhs;
+    Expr rhs;
 };
 
-struct AstNodeScope {
+struct Scope {
     StmtList statements;
 };
 
 struct Branch;
-struct AstNodeIfBlock {
+struct IfBlock {
     std::vector<Branch> brIfElif;
-    ValuePtr<AstNodeStmt> brElse;
+    ValuePtr<Stmt> brElse;
 };
 
-struct AstNodeWhileLoop {
-    AstNodeExpr condition;
-    ValuePtr<AstNodeStmt> body;
+struct WhileLoop {
+    Expr condition;
+    ValuePtr<Stmt> body;
 };
 
-struct AstNodeBreakStmt {};
-struct AstNodeContinueStmt {};
+struct BreakStmt {};
+struct ContinueStmt {};
 
-struct AstNodeStmt
-    : public std::variant<AstNodeStructDecl, AstNodeDeclaration, AstNodeVarAssignment, AstNodeExpr, AstNodeScope,
-                          AstNodeIfBlock, AstNodeWhileLoop, AstNodeBreakStmt, AstNodeContinueStmt> {};
+struct Stmt : public std::variant<StructDecl, Declaration, VarAssignment, Expr, Scope, IfBlock, WhileLoop, BreakStmt,
+                                  ContinueStmt> {};
 
 struct Branch {
-    AstNodeExpr condition;
-    AstNodeStmt body;
+    Expr condition;
+    Stmt body;
 };
 
 struct FunctionDefinition {
     std::vector<TypedVariable> arguments;
     std::vector<TypedVariable> returnVals;
-    AstNodeStmt functionBody;
+    Stmt functionBody;
 };
 
-using FuncDefs = std::unordered_map<std::string, FunctionDefinition>;
+using FuncDefs = std::unordered_map<std::string, ast::FunctionDefinition>;
+
+} // namespace ast
 
 struct ProgramDescription {
-    StmtList ast;
-    FuncDefs functions;
+    ast::StmtList ast;
+    ast::FuncDefs functions;
 };
 
 std::string printAst(ProgramDescription const &program);

@@ -37,10 +37,10 @@ auto getInitialTypeDefs() -> TypeDefs {
                     {BUILTIN_TYPE_BOOL, type::Type{type::Bool{}}}};
 }
 
-auto generateTypeDefs(StmtList const &statements) -> TypeDefs {
+auto generateTypeDefs(ast::StmtList const &statements) -> TypeDefs {
     auto structs = std::span(statements.begin(), statements.end()) |
-                   std::views::filter([](auto const &stmt) { return is<AstNodeStructDecl>(stmt); }) |
-                   std::views::transform([](auto const &stmt) { return as<AstNodeStructDecl>(stmt); });
+                   std::views::filter([](auto const &stmt) { return is<ast::StructDecl>(stmt); }) |
+                   std::views::transform([](auto const &stmt) { return as<ast::StructDecl>(stmt); });
 
     auto typeDefs = getInitialTypeDefs();
 
@@ -124,22 +124,22 @@ std::optional<type::Type> getBinaryOperationType(Token const &op, type::Type con
     return {};
 }
 
-std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, VarTypes const &varTypes, TypeDefs const &typeDefs,
-                                            const FuncDefs &funcDefs) {
-    if (std::holds_alternative<AstNodeIntLiteral>(expr)) {
+std::optional<type::Type> getExpressionType(const ast::Expr &expr, VarTypes const &varTypes, TypeDefs const &typeDefs,
+                                            const ast::FuncDefs &funcDefs) {
+    if (std::holds_alternative<ast::IntLiteral>(expr)) {
         return type::Type{type::I64{}};
     }
 
-    if (std::holds_alternative<AstNodeStringLiteral>(expr)) {
+    if (std::holds_alternative<ast::StringLiteral>(expr)) {
         return type::Type{type::String{}};
     }
 
-    if (std::holds_alternative<AstNodeBoolLiteral>(expr)) {
+    if (std::holds_alternative<ast::BoolLiteral>(expr)) {
         return type::Type{type::Bool{}};
     }
 
-    if (std::holds_alternative<AstNodeIdentifier>(expr)) {
-        const auto &identifier = std::get<AstNodeIdentifier>(expr);
+    if (std::holds_alternative<ast::Identifier>(expr)) {
+        const auto &identifier = std::get<ast::Identifier>(expr);
         const auto &name = identifier.value.name;
 
         if (!varTypes.contains(name)) {
@@ -149,12 +149,12 @@ std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, VarTypes co
         return varTypes.at(name);
     }
 
-    if (is<AstNodeFuncCall>(expr)) {
+    if (is<ast::FuncCall>(expr)) {
         std::cerr << "Can't determine the return type of a function yet." << std::endl;
         return {};
     }
 
-    if (auto const binaryOp = to<AstNodeBinaryOp>(expr)) {
+    if (auto const binaryOp = to<ast::BinaryOp>(expr)) {
         auto const &lhs = *binaryOp->lhs;
         auto const &rhs = *binaryOp->rhs;
 
@@ -173,8 +173,8 @@ std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, VarTypes co
         return getBinaryOperationType(binaryOp->op, *lhsType, *rhsType);
     }
 
-    if (std::holds_alternative<AstNodeNegation>(expr)) {
-        const auto &negation = std::get<AstNodeNegation>(expr);
+    if (std::holds_alternative<ast::Negation>(expr)) {
+        const auto &negation = std::get<ast::Negation>(expr);
         const auto type = getExpressionType(*negation.operand, varTypes, typeDefs, funcDefs);
         if (!type || !std::holds_alternative<type::I64>(*type)) {
             std::cerr << "Type of the expression is not integer." << std::endl;
@@ -183,7 +183,7 @@ std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, VarTypes co
         return type::Type{type::I64{}};
     }
 
-    if (const auto &fnRef = to<AstNodeFuncRef>(expr)) {
+    if (const auto &fnRef = to<ast::FuncRef>(expr)) {
         auto it = funcDefs.find(fnRef->generatedName);
         assert(it != funcDefs.end());
         const auto &fnDef = it->second;
@@ -211,8 +211,8 @@ std::optional<type::Type> getExpressionType(const AstNodeExpr &expr, VarTypes co
         return type::Type{type::Function{.inputTypes = std::move(argTypes), .returnTypes = std::move(retValTypes)}};
     }
 
-    if (is<AstNodeMemberAccess>(expr)) {
-        auto const &memAcc = as<AstNodeMemberAccess>(expr);
+    if (is<ast::MemberAccess>(expr)) {
+        auto const &memAcc = as<ast::MemberAccess>(expr);
 
         auto objType = getExpressionType(*memAcc.object, varTypes, typeDefs, funcDefs);
         if (!objType) {
@@ -234,8 +234,8 @@ VarTypes resolveTypes(const ParserOutput &parserOutput) {
     auto typeDefs = generateTypeDefs(parserOutput.ast);
 
     for (const auto &stmt : parserOutput.ast) {
-        if (is<AstNodeDeclaration>(stmt)) {
-            auto const &[varIdent, typeIdent] = as<AstNodeDeclaration>(stmt);
+        if (is<ast::Declaration>(stmt)) {
+            auto const &[varIdent, typeIdent] = as<ast::Declaration>(stmt);
 
             if (varTypes.contains(varIdent.name)) {
                 std::cerr << varIdent.name << " has already been declared." << std::endl;
@@ -254,14 +254,14 @@ VarTypes resolveTypes(const ParserOutput &parserOutput) {
             continue;
         }
 
-        if (is<AstNodeVarAssignment>(stmt)) {
-            auto const &assignment = as<AstNodeVarAssignment>(stmt);
+        if (is<ast::VarAssignment>(stmt)) {
+            auto const &assignment = as<ast::VarAssignment>(stmt);
 
-            if (!is<AstNodeIdentifier>(assignment.lhs)) {
+            if (!is<ast::Identifier>(assignment.lhs)) {
                 std::cerr << "Can't typecheck assignments with complex left-hand side." << std::endl;
                 continue;
             }
-            auto const &varName = as<AstNodeIdentifier>(assignment.lhs).value.name;
+            auto const &varName = as<ast::Identifier>(assignment.lhs).value.name;
 
             auto type = getExpressionType(assignment.rhs, varTypes, typeDefs, parserOutput.functions);
             if (!type) {
